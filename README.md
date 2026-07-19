@@ -1,5 +1,16 @@
 # Grubs TD 🐜
 
+### ▶ Play now (no install): **https://workflo17.github.io/ant-td/**
+Works in any modern browser, on desktop or phone. First time? Just hit **Play** — a
+guided tutorial walks you through your first round.
+
+> **🧪 Testing this for me? Thank you!** Critiques and bug reports are the whole point.
+> **[→ Open an issue](https://github.com/workflo17/ant-td/issues/new)** and tell me:
+> which map & round, what you were doing, and what felt off (too easy/hard, confusing,
+> ugly, a bug). Rough notes are fine — even "the menu confused me" helps.
+
+---
+
 A Bloons-style tower defense: pest bugs march a pheromone trail toward the colony's
 sugar stash, and you place **ant towers** on the grass to pop them. Bright, chunky,
 cartoon — all art drawn procedurally on Canvas 2D, all sound synthesized with WebAudio.
