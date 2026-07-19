@@ -1572,18 +1572,21 @@ function beginCast(kind) {
 
 // ---------- canvas input ----------
 
-function canvasPos(ev) {
+// world coords from a viewport point (works for mouse, pen and touch)
+function worldFromClient(clientX, clientY) {
   const r = els.canvas.getBoundingClientRect();
   return {
-    x: (ev.clientX - r.left) * WORLD_W / r.width,
-    y: (ev.clientY - r.top) * WORLD_H / r.height,
+    x: (clientX - r.left) * WORLD_W / r.width,
+    y: (clientY - r.top) * WORLD_H / r.height,
   };
 }
 
 function wireCanvas() {
-  els.canvas.addEventListener('pointermove', (ev) => {
+  const cv = els.canvas;
+
+  // ghost/range preview under the cursor or finger
+  function moveTo(p) {
     if (!game) return;
-    const p = canvasPos(ev);
     if (uiState.placingType) {
       uiState.ghostX = p.x;
       uiState.ghostY = p.y;
@@ -1593,45 +1596,31 @@ function wireCanvas() {
       uiState.ghostX = p.x;
       uiState.ghostY = p.y;
     }
-  });
-  els.canvas.addEventListener('pointerdown', (ev) => {
+  }
+
+  // place / cast / select at a point (opts.rightClick cancels; opts.keepPlacing = shift-place)
+  function downAt(p, opts) {
+    opts = opts || {};
     if (!game) return;
     unlockAudio();
-    const p = canvasPos(ev);
-    if (ev.button === 2) { stopPlacing(); return; }
+    if (opts.rightClick) { stopPlacing(); return; }
     if (uiState.casting === 'decoy') {
-      if (game.placeDecoy(p.x, p.y)) {
-        uiState.casting = null;
-        renderPanel();
-      }
+      if (game.placeDecoy(p.x, p.y)) { uiState.casting = null; renderPanel(); }
       return;
     }
     if (uiState.casting) {
-      if (game.castPower(uiState.casting, p.x, p.y)) {
-        uiState.casting = null;
-        renderPanel();
-      }
+      if (game.castPower(uiState.casting, p.x, p.y)) { uiState.casting = null; renderPanel(); }
       return;
     }
     if (uiState.placingType === 'hero') {
       const t = game.placeHero(p.x, p.y);
-      if (t) {
-        stopPlacing();
-        uiState.selected = t;
-        renderShop();
-        renderPanel();
-      }
+      if (t) { stopPlacing(); uiState.selected = t; renderShop(); renderPanel(); }
       return;
     }
     if (uiState.placingType) {
       const t = game.placeTower(uiState.placingType, p.x, p.y);
-      if (t && !ev.shiftKey) {
-        stopPlacing();
-        uiState.selected = t;
-        renderPanel();
-      } else if (t) {
-        uiState.ghostValid = game.canPlace(uiState.placingType, p.x, p.y) && game.sugar >= game.cost(uiState.placingType);
-      }
+      if (t && !opts.keepPlacing) { stopPlacing(); uiState.selected = t; renderPanel(); }
+      else if (t) { uiState.ghostValid = game.canPlace(uiState.placingType, p.x, p.y) && game.sugar >= game.cost(uiState.placingType); }
       return;
     }
     let best = null, bd = 1e9;
@@ -1641,9 +1630,47 @@ function wireCanvas() {
     }
     uiState.selected = best;
     renderPanel();
+  }
+
+  // Mouse & pen via Pointer Events. Touch is handled by the touch listeners below instead,
+  // because older iOS Safari doesn't deliver pointer events to a <canvas> — which is exactly
+  // why "can't place ants" happens on iPhone while the menu buttons (plain clicks) still work.
+  cv.addEventListener('pointermove', (ev) => { if (ev.pointerType !== 'touch') moveTo(worldFromClient(ev.clientX, ev.clientY)); });
+  cv.addEventListener('pointerdown', (ev) => {
+    if (ev.pointerType === 'touch') return;
+    downAt(worldFromClient(ev.clientX, ev.clientY), { rightClick: ev.button === 2, keepPlacing: ev.shiftKey });
   });
-  els.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  els.canvas.addEventListener('pointerleave', () => { uiState.ghostX = null; });
+  cv.addEventListener('pointerleave', () => { uiState.ghostX = null; });
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // Touch: drag to aim, lift to place. Universal across browsers (incl. old iOS). The canvas
+  // has touch-action:none, and preventDefault stops page scroll/zoom + the synthetic click.
+  let touchPt = null;
+  const touchXY = (ev) => {
+    const t = (ev.touches && ev.touches[0]) || (ev.changedTouches && ev.changedTouches[0]);
+    return t ? worldFromClient(t.clientX, t.clientY) : null;
+  };
+  cv.addEventListener('touchstart', (ev) => {
+    if (!game) return;
+    ev.preventDefault();
+    touchPt = touchXY(ev);
+    if (touchPt) moveTo(touchPt); // show the range ring before they commit
+  }, { passive: false });
+  cv.addEventListener('touchmove', (ev) => {
+    if (!game) return;
+    ev.preventDefault();
+    const p = touchXY(ev);
+    if (p) { touchPt = p; moveTo(p); }
+  }, { passive: false });
+  cv.addEventListener('touchend', (ev) => {
+    if (!game) return;
+    ev.preventDefault();
+    const p = touchXY(ev) || touchPt;
+    if (p) downAt(p);
+    uiState.ghostX = null;
+    touchPt = null;
+  }, { passive: false });
+  cv.addEventListener('touchcancel', () => { uiState.ghostX = null; touchPt = null; });
 }
 
 // ---------- keyboard ----------
