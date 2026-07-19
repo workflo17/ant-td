@@ -475,22 +475,29 @@ export function drawAnt(c, typeId, def, opts) {
     }
   }
 
-  // eyes (archer wears targeting goggles)
+  // compound eyes: dark, faceted, set on the SIDES of the head (as real ants have them),
+  // not forward-facing cartoon eyes. A single reflective glint keeps them lively.
+  const eyeR = Math.max(1.8, P.head * 0.3);
+  for (let side = -1; side <= 1; side += 2) {
+    const ex = side * P.head * 0.6, ey = hy0 - P.head * 0.12;
+    c.fillStyle = mixHex(dark, '#050302', 0.45);
+    c.strokeStyle = INK; c.lineWidth = 1;
+    c.beginPath(); c.ellipse(ex, ey, eyeR * 0.78, eyeR, side * 0.28, 0, TAU); c.fill(); c.stroke();
+    // faint facet banding
+    c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 0.7;
+    c.beginPath(); c.ellipse(ex, ey, eyeR * 0.5, eyeR * 0.66, side * 0.28, 0, TAU); c.stroke();
+    // reflective glint
+    c.fillStyle = 'rgba(255,255,255,0.5)';
+    c.beginPath(); c.arc(ex - side * 0.7, ey - eyeR * 0.4, eyeR * 0.28, 0, TAU); c.fill();
+  }
+  // archer keeps a sniper's monocle scope over one eye (a prop, not a googly eye)
   if (typeId === 'archer') {
-    c.fillStyle = '#c9f0ff';
-    c.lineWidth = 1.6;
-    c.beginPath(); c.arc(-2.8, hy0 - 1, 2.5, 0, TAU); c.fill(); c.stroke();
-    c.beginPath(); c.arc(2.8, hy0 - 1, 2.5, 0, TAU); c.fill(); c.stroke();
-    c.fillStyle = INK;
-    c.beginPath(); c.arc(-2.8, hy0 - 1, 0.9, 0, TAU); c.fill();
-    c.beginPath(); c.arc(2.8, hy0 - 1, 0.9, 0, TAU); c.fill();
-  } else {
-    c.fillStyle = '#fff';
-    c.beginPath(); c.arc(-P.head * 0.4, hy0 - 1, 1.8, 0, TAU); c.fill();
-    c.beginPath(); c.arc(P.head * 0.4, hy0 - 1, 1.8, 0, TAU); c.fill();
-    c.fillStyle = INK;
-    c.beginPath(); c.arc(-P.head * 0.4, hy0 - 0.6, 0.8, 0, TAU); c.fill();
-    c.beginPath(); c.arc(P.head * 0.4, hy0 - 0.6, 0.8, 0, TAU); c.fill();
+    const ex = -P.head * 0.6, ey = hy0 - P.head * 0.12;
+    c.strokeStyle = INK; c.lineWidth = 1.6;
+    c.beginPath(); c.arc(ex, ey, eyeR + 1.2, 0, TAU); c.stroke();
+    c.strokeStyle = 'rgba(143,211,232,0.9)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(ex - eyeR, ey); c.lineTo(ex + eyeR, ey); c.stroke();
+    c.beginPath(); c.moveTo(ex, ey - eyeR); c.lineTo(ex, ey + eyeR); c.stroke();
   }
 
   // weaver holds a leaf in her jaws
