@@ -12,6 +12,46 @@
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/style.css">
+<script>
+// Boot safety net: if anything throws before the game comes up (common on older phone
+// browsers), show the error instead of a blank screen — and offer a cache-clear reload,
+// which fixes a stale/broken cached build (the usual "worked yesterday, blank today").
+(function () {
+  function showErr(msg) {
+    var d = document.getElementById('boot-error');
+    if (!d) {
+      d = document.createElement('div');
+      d.id = 'boot-error';
+      d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#2b1a10;color:#ffe9a8;'
+        + 'font:14px/1.5 -apple-system,system-ui,sans-serif;padding:24px;overflow:auto;-webkit-text-size-adjust:100%';
+      (document.body || document.documentElement).appendChild(d);
+    }
+    d.innerHTML = '<h2 style="margin:0 0 8px;font-size:20px">Grubs TD hit a snag loading 🐜</h2>'
+      + '<p style="margin:0 0 12px;opacity:.85">Tap the button below first. If it still fails, screenshot this and send it over.</p>'
+      + '<button id="be-fix" style="padding:12px 18px;font:inherit;font-weight:700;background:#f5a623;'
+      + 'border:2px solid #ffe9a8;border-radius:10px;color:#2b1a10;margin-bottom:14px">Clear cache &amp; reload</button>'
+      + '<pre style="white-space:pre-wrap;background:rgba(0,0,0,.3);padding:12px;border-radius:8px;'
+      + 'font-size:12px;margin:0">' + String(msg).replace(/</g, '&lt;') + '</pre>';
+    document.getElementById('be-fix').onclick = function () {
+      Promise.resolve()
+        .then(function () {
+          if (navigator.serviceWorker) return navigator.serviceWorker.getRegistrations()
+            .then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); });
+        })
+        .then(function () { if (window.caches) return caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }); })
+        .catch(function () {})
+        .then(function () { location.reload(); });
+    };
+  }
+  window.addEventListener('error', function (e) {
+    if (e.target && e.target !== window && e.target.tagName) return; // ignore failed <img>/<audio>, not script errors
+    showErr((e.message || 'Script error') + (e.filename ? '\n' + e.filename + ':' + (e.lineno || '?') : ''));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    showErr('Unhandled promise: ' + ((e.reason && e.reason.message) || e.reason || 'unknown'));
+  });
+})();
+</script>
 </head>
 <body>
 
