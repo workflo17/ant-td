@@ -250,13 +250,46 @@ export function drawBugBody(c, e, time) {
     c.beginPath(); c.moveTo(rx * 1.1, 0); c.lineTo(rx * 1.6, 0); c.stroke();
   }
 
-  // eyes
-  c.fillStyle = '#fff';
-  c.beginPath(); c.arc(rx * 0.95, -ry * 0.22, 2.6, 0, TAU); c.fill();
-  c.beginPath(); c.arc(rx * 0.95, ry * 0.22, 2.6, 0, TAU); c.fill();
-  c.fillStyle = INK;
-  c.beginPath(); c.arc(rx * 1.02, -ry * 0.22, 1.2, 0, TAU); c.fill();
-  c.beginPath(); c.arc(rx * 1.02, ry * 0.22, 1.2, 0, TAU); c.fill();
+  // eyes — bosses get bigger, glowing menace eyes with an angry brow
+  if (t.boss) {
+    const ex = rx * 0.95, ey = ry * 0.24, er = 3.4;
+    for (let side = -1; side <= 1; side += 2) {
+      c.fillStyle = 'rgba(255,60,30,0.35)'; // hot glow halo
+      c.beginPath(); c.arc(ex, side * ey, er + 2.2, 0, TAU); c.fill();
+      c.fillStyle = '#ffe08a';
+      c.beginPath(); c.arc(ex, side * ey, er, 0, TAU); c.fill();
+      c.fillStyle = '#e2331a';
+      c.beginPath(); c.arc(ex + 0.6, side * ey, er * 0.62, 0, TAU); c.fill();
+      c.fillStyle = INK;
+      c.beginPath(); c.arc(ex + 1, side * ey, er * 0.3, 0, TAU); c.fill();
+    }
+    // angry brow ridges
+    c.strokeStyle = INK; c.lineWidth = 2.4;
+    c.beginPath(); c.moveTo(rx * 0.7, -ey - er); c.lineTo(rx * 1.05, -ey + 1); c.stroke();
+    c.beginPath(); c.moveTo(rx * 0.7, ey + er); c.lineTo(rx * 1.05, ey - 1); c.stroke();
+  } else {
+    c.fillStyle = '#fff';
+    c.beginPath(); c.arc(rx * 0.95, -ry * 0.22, 2.6, 0, TAU); c.fill();
+    c.beginPath(); c.arc(rx * 0.95, ry * 0.22, 2.6, 0, TAU); c.fill();
+    c.fillStyle = INK;
+    c.beginPath(); c.arc(rx * 1.02, -ry * 0.22, 1.2, 0, TAU); c.fill();
+    c.beginPath(); c.arc(rx * 1.02, ry * 0.22, 1.2, 0, TAU); c.fill();
+  }
+  // hornet queen's crown
+  if (id === 'hornetQueen') {
+    c.fillStyle = '#ffd24a';
+    c.strokeStyle = INK;
+    c.lineWidth = 2;
+    const cy = -ry * 0.62;
+    c.beginPath();
+    c.moveTo(rx * 0.55, cy + 5);
+    c.lineTo(rx * 0.6, cy - 5); c.lineTo(rx * 0.78, cy + 1);
+    c.lineTo(rx * 0.95, cy - 7); c.lineTo(rx * 1.12, cy + 1);
+    c.lineTo(rx * 1.3, cy - 5); c.lineTo(rx * 1.35, cy + 5);
+    c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#e2472f';
+    c.beginPath(); c.arc(rx * 0.95, cy - 2, 1.8, 0, TAU); c.fill();
+  }
 
   // antennae
   c.strokeStyle = INK;

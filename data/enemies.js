@@ -62,7 +62,7 @@ export const ENEMIES = {
     hint: 'Acid Archer shell-piercers shine.',
   },
   stagBeetle: {
-    name: 'Stag Beetle', hp: 320, speed: 24, radius: 24, rank: 6,
+    name: 'Stag Beetle', hp: 320, speed: 24, radius: 31, rank: 6,
     color: '#5a4030', dark: '#241407', children: [['pillbug', 3]],
     boss: true, armored: true, hpBar: true, slowResist: 0.6, stunImmune: true,
     charge: { every: 6, dur: 1.2, mul: 2.2 },
@@ -71,7 +71,7 @@ export const ENEMIES = {
     introSub: 'It charges every 6 seconds!',
   },
   caterpillar: {
-    name: 'Caterpillar', hp: 200, speed: 26, radius: 20, rank: 7,
+    name: 'Caterpillar', hp: 200, speed: 26, radius: 27, rank: 7,
     color: '#8bc34a', dark: '#33691e', children: [['snail', 4]],
     boss: true, segmented: true, hpBar: true, slowResist: 0.5, stunImmune: true,
     desc: 'A 200 HP segmented blimp of a bug. Spawns 4 Snails on death.',
@@ -79,7 +79,7 @@ export const ENEMIES = {
     introSub: 'It bursts into Snails!',
   },
   hornetQueen: {
-    name: 'Hornet Queen', hp: 700, speed: 19, radius: 28, rank: 8,
+    name: 'Hornet Queen', hp: 700, speed: 19, radius: 37, rank: 8,
     color: '#ffb020', dark: '#7a4a00', children: [['caterpillar', 4]],
     boss: true, wings: true, stripes: true, hpBar: true, slowResist: 0.75, stunImmune: true,
     desc: 'The final boss. 700 HP, spawns 4 Caterpillars on death.',

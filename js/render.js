@@ -783,28 +783,47 @@ export function drawEnemy(game, e, time) {
   e.stun_active = game.time < e.stunUntilT || game.time < e.snareUntilT;
 
   if (t.segmented) {
-    // caterpillar: trailing segments along the trail
+    // caterpillar: a bristled, toxic blimp — trailing segments along the trail
     const path = game.paths[e.pathIdx];
     const spot = { x: 0, y: 0, angle: 0, seg: 0 };
     const { fill, dark } = bodyColors(e);
-    for (let i = 5; i >= 1; i--) {
-      const d = Math.max(0, e.dist - i * 24);
+    const gap = t.radius * 0.92;
+    const toxic = e.camo ? fill : '#b6d94a';   // sickly highlight tone
+    for (let i = 6; i >= 1; i--) {
+      const d = Math.max(0, e.dist - i * gap);
       posAt(path, d, spot, 0);
-      const sr = t.radius * (1 - i * 0.09);
+      const sr = t.radius * (1 - i * 0.075);
       ctx.save();
       ctx.translate(spot.x, spot.y);
-      ctx.fillStyle = 'rgba(43,26,16,0.16)';
-      ctx.beginPath(); ctx.ellipse(3, sr * 0.55 + 3, sr * 1.05, sr * 0.4, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = bodyGrad(ctx, i % 2 ? fill : dark, mixHex(dark, '#100804', 0.35), sr);
+      ctx.fillStyle = 'rgba(43,26,16,0.2)';
+      ctx.beginPath(); ctx.ellipse(3, sr * 0.55 + 4, sr * 1.1, sr * 0.42, 0, 0, TAU); ctx.fill();
+      // bristles: dark hairs fan out from each segment
+      ctx.strokeStyle = 'rgba(30,45,12,0.9)';
+      ctx.lineWidth = 2;
+      for (let h = 0; h < 5; h++) {
+        const a = -1.9 - h * 0.35 - (i % 2) * 0.17;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * sr * 0.7, Math.sin(a) * sr * 0.7);
+        ctx.lineTo(Math.cos(a) * (sr + 6), Math.sin(a) * (sr + 6));
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(-a) * sr * 0.7, Math.sin(-a) * sr * 0.7);
+        ctx.lineTo(Math.cos(-a) * (sr + 6), Math.sin(-a) * (sr + 6));
+        ctx.stroke();
+      }
+      ctx.fillStyle = bodyGrad(ctx, i % 2 ? fill : mixHex(dark, '#0b1a04', 0.3), mixHex(dark, '#0a1503', 0.4), sr);
       ctx.strokeStyle = INK;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3.2;
       ctx.beginPath(); ctx.arc(0, 0, sr, 0, TAU); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = 'rgba(255,255,255,0.22)';
-      ctx.beginPath(); ctx.ellipse(-sr * 0.3, -sr * 0.4, sr * 0.24, sr * 0.14, -0.4, 0, TAU); ctx.fill();
-      // stubby feet
-      ctx.strokeStyle = INK; ctx.lineWidth = 2.4;
-      ctx.beginPath(); ctx.moveTo(-3, sr); ctx.lineTo(-3, sr + 5); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(4, sr); ctx.lineTo(4, sr + 5); ctx.stroke();
+      // toxic spots + wet highlight
+      ctx.fillStyle = i % 2 ? 'rgba(40,60,15,0.55)' : toxic;
+      ctx.beginPath(); ctx.arc(0, sr * 0.15, sr * 0.28, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+      ctx.beginPath(); ctx.ellipse(-sr * 0.32, -sr * 0.42, sr * 0.26, sr * 0.15, -0.4, 0, TAU); ctx.fill();
+      // stubby clawed feet
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.6;
+      ctx.beginPath(); ctx.moveTo(-4, sr); ctx.lineTo(-4, sr + 6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(5, sr); ctx.lineTo(5, sr + 6); ctx.stroke();
       ctx.restore();
     }
   }
