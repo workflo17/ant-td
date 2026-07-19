@@ -197,17 +197,32 @@ export function drawAnt(c, typeId, def, opts) {
   c.fillStyle = 'rgba(255,255,255,0.3)';
   c.beginPath(); c.ellipse(-P.g[0] * 0.35, gy - P.g[1] * 0.4, 2.4, 3.2, -0.4, 0, TAU); c.fill();
 
-  // weaver: spinneret + silk strand + leaf held in the jaws
+  // weaver: a silk-spinner — woven web fan behind, spinneret sac, dangling beaded threads
   if (typeId === 'weaver') {
+    const sy = gy + P.g[1];
+    // faint woven web fan behind the abdomen
+    c.strokeStyle = 'rgba(238,246,244,0.5)';
+    c.lineWidth = 1;
+    for (let i = -2; i <= 2; i++) {
+      c.beginPath(); c.moveTo(0, sy - 2); c.lineTo(i * 7, sy + 16); c.stroke();
+    }
+    for (let r = 6; r <= 14; r += 4) {
+      c.beginPath(); c.moveTo(-r, sy + r * 0.9); c.quadraticCurveTo(0, sy + r * 0.55, r, sy + r * 0.9); c.stroke();
+    }
+    // glossy silk sac at the spinneret
     c.fillStyle = '#eef6f4';
-    c.lineWidth = 1.6;
-    c.beginPath(); c.moveTo(-2.5, gy + P.g[1] - 2); c.lineTo(2.5, gy + P.g[1] - 2); c.lineTo(0, gy + P.g[1] + 3); c.closePath(); c.fill(); c.stroke();
-    c.strokeStyle = '#eef6f4';
-    c.lineWidth = 2;
-    c.beginPath();
-    c.moveTo(0, gy + P.g[1] + 3);
-    c.quadraticCurveTo(4, gy + P.g[1] + 9, -2, gy + P.g[1] + 15);
-    c.stroke();
+    c.strokeStyle = INK; c.lineWidth = 1.6;
+    c.beginPath(); c.ellipse(0, sy + 1, 3.4, 4.2, 0, 0, TAU); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.7)';
+    c.beginPath(); c.arc(-1, sy - 0.4, 1.1, 0, TAU); c.fill();
+    // dangling beaded threads
+    c.strokeStyle = 'rgba(238,246,244,0.85)'; c.lineWidth = 1.4;
+    for (const dx of [-3, 2]) {
+      c.beginPath(); c.moveTo(dx * 0.4, sy + 4);
+      c.quadraticCurveTo(dx, sy + 10, dx * 0.6, sy + 16); c.stroke();
+      c.fillStyle = '#eef6f4';
+      c.beginPath(); c.arc(dx * 0.6, sy + 16, 1.4, 0, TAU); c.fill();
+    }
     c.strokeStyle = INK;
   }
 
@@ -343,14 +358,26 @@ export function drawAnt(c, typeId, def, opts) {
       c.stroke();
     }
   } else if (typeId === 'majoress') {
-    // regal crown
-    c.fillStyle = '#ffd166';
-    c.strokeStyle = INK;
-    c.lineWidth = 1.8;
+    // acid tusks + a tall jeweled crown — a royal heavyweight
+    const hf = headFront;
+    c.lineCap = 'round';
+    c.strokeStyle = dark; c.lineWidth = 3.4;
+    for (let side = -1; side <= 1; side += 2) { c.beginPath(); c.moveTo(side * 3, hf + 3); c.quadraticCurveTo(side * 7.5, hf - 2, side * 4.5, hf - 8); c.stroke(); }
+    c.strokeStyle = INK; c.lineWidth = 1.4;
+    for (let side = -1; side <= 1; side += 2) { c.beginPath(); c.moveTo(side * 3, hf + 3); c.quadraticCurveTo(side * 7.5, hf - 2, side * 4.5, hf - 8); c.stroke(); }
+    c.fillStyle = '#ffd166'; c.strokeStyle = INK; c.lineWidth = 1.8;
     c.beginPath();
-    c.moveTo(-6, headFront - 1); c.lineTo(-4, headFront - 7); c.lineTo(0, headFront - 2);
-    c.lineTo(4, headFront - 7); c.lineTo(6, headFront - 1);
+    c.moveTo(-7.5, hf - 1); c.lineTo(-7.5, hf - 6); c.lineTo(-4.5, hf - 3); c.lineTo(-2.5, hf - 11);
+    c.lineTo(0, hf - 4); c.lineTo(2.5, hf - 11); c.lineTo(4.5, hf - 3); c.lineTo(7.5, hf - 6); c.lineTo(7.5, hf - 1);
     c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#e2472f'; c.beginPath(); c.arc(0, hf - 9.5, 1.6, 0, TAU); c.fill();
+    c.fillStyle = '#8fd3e8'; c.beginPath(); c.arc(-2.5, hf - 10, 1.1, 0, TAU); c.fill(); c.beginPath(); c.arc(2.5, hf - 10, 1.1, 0, TAU); c.fill();
+  } else if (typeId === 'worker') {
+    // small working mandibles with a bead of acid — the reliable grunt
+    c.strokeStyle = INK; c.lineWidth = 2.4; c.lineCap = 'round';
+    for (let side = -1; side <= 1; side += 2) { c.beginPath(); c.moveTo(side * 2.5, headFront + 2); c.quadraticCurveTo(side * 6, headFront - 2, side * 3, headFront - 6); c.stroke(); }
+    c.fillStyle = '#9be34a';
+    c.beginPath(); c.arc(0, headFront - 1, 1.7, 0, TAU); c.fill();
   } else if (typeId === 'hero') {
     if (opts.hero === 'formica') {
       // war banner + heavy jaws (mirror-exact)
