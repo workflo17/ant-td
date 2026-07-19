@@ -998,8 +998,8 @@ function updateCritters(game, time, rdt) {
       });
     }
   }
-  if (critters.length < 2 && critterT <= 0) {
-    critterT = 7 + Math.random() * 9;
+  if (critters.length < 4 && critterT <= 0) {
+    critterT = 4 + Math.random() * 6;
     if (bg === 'night') {
       // handled above — fireflies own the night
     } else if (bg === 'kitchen') {
@@ -1017,7 +1017,7 @@ function updateCritters(game, time, rdt) {
         age: 0, life: 24, phase: Math.random() * 10,
       });
     } else {
-      const kind = bg === 'picnic' ? 'ladybug' : 'butterfly';
+      const kind = bg === 'picnic' ? (Math.random() < 0.55 ? 'butterfly' : 'ladybug') : 'butterfly';
       const fromLeft = Math.random() > 0.5;
       critters.push({
         kind,
@@ -1208,20 +1208,25 @@ export function draw(game, ui, time) {
     }
   }
 
-  // pheromone stream: dots flow along the trail toward the basket
+  // pheromone stream: comet dots flow along the trail toward the basket
   {
     const spot = { x: 0, y: 0, angle: 0, seg: 0 };
-    const SP = 64;
-    const off = (time * 52) % SP;
-    ctx.fillStyle = 'rgba(255,248,220,0.5)';
+    const SP = 58;
+    const off = (time * 60) % SP;
+    ctx.lineCap = 'round';
     for (const path of game.paths) {
       spot.seg = 0;
       for (let d = off; d < path.length; d += SP) {
         posAt(path, d, spot, spot.seg);
         const tw = 0.5 + 0.5 * Math.sin(time * 3 + d * 0.05);
-        ctx.beginPath();
-        ctx.arc(spot.x, spot.y, 1.7 + tw * 1.3, 0, TAU);
-        ctx.fill();
+        const dx = Math.cos(spot.angle), dy = Math.sin(spot.angle);
+        // motion tail trailing behind the flow direction
+        ctx.strokeStyle = `rgba(255,238,186,${0.2 + tw * 0.16})`;
+        ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.moveTo(spot.x - dx * 10, spot.y - dy * 10); ctx.lineTo(spot.x, spot.y); ctx.stroke();
+        // bright head
+        ctx.fillStyle = `rgba(255,247,214,${0.55 + tw * 0.3})`;
+        ctx.beginPath(); ctx.arc(spot.x, spot.y, 1.7 + tw * 1.2, 0, TAU); ctx.fill();
       }
     }
   }
