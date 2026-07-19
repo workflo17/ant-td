@@ -446,6 +446,12 @@ html, body {
 @media (prefers-reduced-motion: reduce) { #coach-spot { transition: none; } }
 /* guided tutorial: off-script controls are locked out so only the lit step works */
 .coach-locked { pointer-events: none; opacity: 0.35; filter: grayscale(0.65); }
+/* tiny build stamp — confirms the loaded version (helps catch stale phone caches) */
+#build-tag { position: fixed; left: 4px; bottom: 3px; z-index: 100; pointer-events: none;
+  font: 700 9px/1 monospace; color: rgba(255,255,255,0.5); text-shadow: 0 1px 1px rgba(0,0,0,0.5); }
+#diag-panel { position: fixed; right: 6px; top: 6px; z-index: 100; pointer-events: none;
+  font: 700 11px/1.35 monospace; white-space: pre; color: #7CFC00; background: rgba(0,0,0,0.72);
+  padding: 6px 8px; border-radius: 6px; }
 .sc-air { font-size: 9px; color: var(--wood); font-weight: 700; }
 .sc-air.no-air { color: var(--red); }
 .pc-ground { color: var(--red); font-size: 12px; font-weight: 700; margin-bottom: 8px; }

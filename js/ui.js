@@ -59,6 +59,8 @@ export const uiState = {
   casting: null, // 'rain' | 'guards'
 };
 
+// bump on every mobile-input change so we can confirm a phone isn't on a stale cache
+const BUILD = 'input3-touch+click';
 let selMapId = 'picnic';
 let selDiff = 'easy';
 let dispSugar = null;    // tweened HUD sugar value
@@ -164,7 +166,29 @@ export function init() {
   els.btnTitlePerks.addEventListener('click', showPerks);
   els.btnTitleSound.addEventListener('click', () => { toggleMute(); refreshTitle(); });
 
+  // tiny build stamp (confirms a phone isn't stuck on a stale cached version)
+  const tag = document.createElement('div');
+  tag.id = 'build-tag';
+  tag.textContent = BUILD;
+  document.body.appendChild(tag);
+  if (DIAG_ON) {
+    const dp = document.createElement('div');
+    dp.id = 'diag-panel';
+    document.body.appendChild(dp);
+  }
+
   showTitle();
+}
+
+const DIAG_ON = new URLSearchParams(location.search).has('diag');
+function renderDiag() {
+  if (!DIAG_ON) return;
+  const el = document.getElementById('diag-panel');
+  const d = window.__diag;
+  if (!el || !d) return;
+  el.textContent = `${d.ver}\ntouch s/e: ${d.touchstart}/${d.touchend}\nclick: ${d.click}  ptr: ${d.pointerdown}`
+    + `\nplaced: ${d.placed}  last: ${d.last}\nplacing: ${uiState.placingType || uiState.casting || '-'}`
+    + `\ntowers: ${game ? game.towers.length : 0}`;
 }
 
 // ---- front-door screen routing ----
@@ -1132,6 +1156,7 @@ export function tick() {
   updateCamoCoach();
   updateDecoyCoach();
   updateBugCards();
+  renderDiag();
   // adaptive music intensity
   ensureStarted();
   if (game.state !== 'inround') setIntensity(0);
@@ -1632,29 +1657,29 @@ function wireCanvas() {
     renderPanel();
   }
 
-  // Mouse & pen via Pointer Events. Touch is handled by the touch listeners below instead,
-  // because older iOS Safari doesn't deliver pointer events to a <canvas> — which is exactly
-  // why "can't place ants" happens on iPhone while the menu buttons (plain clicks) still work.
-  cv.addEventListener('pointermove', (ev) => { if (ev.pointerType !== 'touch') moveTo(worldFromClient(ev.clientX, ev.clientY)); });
-  cv.addEventListener('pointerdown', (ev) => {
-    if (ev.pointerType === 'touch') return;
-    downAt(worldFromClient(ev.clientX, ev.clientY), { rightClick: ev.button === 2, keepPlacing: ev.shiftKey });
-  });
-  cv.addEventListener('pointerleave', () => { uiState.ghostX = null; });
-  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  cv.style.cursor = 'pointer'; // hints iOS Safari to deliver taps to the canvas as clicks
+  window.__diag = window.__diag || { ver: BUILD, click: 0, touchstart: 0, touchend: 0, pointerdown: 0, placed: 0, last: '-' };
+  const D = window.__diag;
+  let lastTouchT = 0;
 
-  // Touch: drag to aim, lift to place. Universal across browsers (incl. old iOS). The canvas
-  // has touch-action:none, and preventDefault stops page scroll/zoom + the synthetic click.
-  let touchPt = null;
+  // Mouse & pen: ghost preview via pointermove; placement handled by the click listener below.
+  cv.addEventListener('pointermove', (ev) => { if (ev.pointerType !== 'touch') moveTo(worldFromClient(ev.clientX, ev.clientY)); });
+  cv.addEventListener('pointerdown', () => { D.pointerdown++; });
+  cv.addEventListener('pointerleave', () => { uiState.ghostX = null; });
+  cv.addEventListener('contextmenu', (e) => { e.preventDefault(); stopPlacing(); });
+
+  // Touch: drag to aim, lift to place. preventDefault stops page scroll/zoom + the synthetic
+  // click (so no double). touch-action:none on the canvas keeps the gesture on the board.
   const touchXY = (ev) => {
     const t = (ev.touches && ev.touches[0]) || (ev.changedTouches && ev.changedTouches[0]);
     return t ? worldFromClient(t.clientX, t.clientY) : null;
   };
+  let touchPt = null;
   cv.addEventListener('touchstart', (ev) => {
     if (!game) return;
-    ev.preventDefault();
+    D.touchstart++; ev.preventDefault();
     touchPt = touchXY(ev);
-    if (touchPt) moveTo(touchPt); // show the range ring before they commit
+    if (touchPt) moveTo(touchPt);
   }, { passive: false });
   cv.addEventListener('touchmove', (ev) => {
     if (!game) return;
@@ -1664,13 +1689,24 @@ function wireCanvas() {
   }, { passive: false });
   cv.addEventListener('touchend', (ev) => {
     if (!game) return;
-    ev.preventDefault();
+    D.touchend++; ev.preventDefault();
     const p = touchXY(ev) || touchPt;
-    if (p) downAt(p);
-    uiState.ghostX = null;
-    touchPt = null;
+    if (p) { const was = uiState.placingType || uiState.casting || 'select'; downAt(p); D.placed++; D.last = was; }
+    uiState.ghostX = null; touchPt = null; lastTouchT = performance.now();
   }, { passive: false });
   cv.addEventListener('touchcancel', () => { uiState.ghostX = null; touchPt = null; });
+
+  // Placement via CLICK — the same event that makes the menu buttons work on iOS, so this
+  // fires even when a <canvas> gets no pointer/touch events. Skipped when a touchend just
+  // handled the same tap, so mouse & touch never double-place.
+  cv.addEventListener('click', (ev) => {
+    if (!game) return;
+    D.click++;
+    if (performance.now() - lastTouchT < 700) return;
+    const was = uiState.placingType || uiState.casting || 'select';
+    downAt(worldFromClient(ev.clientX, ev.clientY), { keepPlacing: ev.shiftKey });
+    D.placed++; D.last = was;
+  });
 }
 
 // ---------- keyboard ----------
