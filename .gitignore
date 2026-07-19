@@ -1,0 +1,8 @@
+# Dev-only capture screenshots (large; not needed to play or host)
+shots/
+
+# Python / OS cruft
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

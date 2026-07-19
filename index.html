@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Grubs TD">
+<title>Grubs TD — defend the sugar stash</title>
+<meta name="theme-color" content="#63a832">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="screen-title" class="screen">
+  <div class="title-inner">
+    <div class="title-ants" aria-hidden="true"><span>🐜</span><span>🐜</span><span>🐜</span></div>
+    <h1 class="logo">GRUBS<span class="logo-td">TD</span></h1>
+    <p class="title-primer">Ants vs. picnic pests. Place ants along the trail and pop the bugs
+      before they reach your basket.</p>
+    <button id="btn-title-play" class="sticker big-btn">▶ Play</button>
+    <p id="title-newhint" class="title-newhint hidden">New here? Play starts a short guided game.</p>
+    <div class="title-row">
+      <button id="btn-howto" class="sticker mini-btn">❔ How to Play</button>
+      <button id="btn-levels" class="sticker mini-btn">🗺 Levels &amp; Modes</button>
+    </div>
+    <div class="title-foot">
+      <button id="btn-title-ach" class="sticker mini-btn" title="Achievements">🏆</button>
+      <button id="btn-title-stats" class="sticker mini-btn" title="Lifetime stats">📊</button>
+      <button id="btn-title-perks" class="sticker mini-btn" title="Colony perks">🍯</button>
+      <button id="btn-title-sound" class="sticker mini-btn" title="Sound on/off">🔊</button>
+    </div>
+  </div>
+</div>
+
+<div id="screen-menu" class="screen hidden">
+  <div class="menu-inner">
+    <button id="btn-menu-back" class="sticker mini-btn menu-back">← Title</button>
+    <h1 class="logo">GRUBS<span class="logo-td">TD</span></h1>
+    <p class="tagline">Pest bugs are marching on the colony's sugar stash.<br>The ants answer.</p>
+    <div id="map-cards"></div>
+    <div id="diff-row"></div>
+    <button id="btn-play" class="sticker big-btn">🐜 Defend the stash!</button>
+    <p class="menu-foot">Sugar buys ants · Crumbs are lives · Survive 40 rounds</p>
+  </div>
+</div>
+
+<div id="screen-game" class="screen hidden">
+  <div id="hud"></div>
+  <div id="main-row">
+    <div id="playfield">
+      <canvas id="game-canvas" width="960" height="640" tabindex="0"
+              aria-label="Game board. Pick an ant with keys 1-9, click the grass to place it. Space starts the round."></canvas>
+    </div>
+    <div id="sidebar">
+      <div id="shop"></div>
+      <div id="panel"></div>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="hidden">
+  <div id="modal-card" class="sticker"></div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

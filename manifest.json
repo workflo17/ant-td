@@ -1,0 +1,14 @@
+{
+  "name": "Grubs TD — defend the sugar stash",
+  "short_name": "Grubs TD",
+  "description": "Ant-powered tower defense. Pop the pest bugs before they reach the colony's sugar.",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#63a144",
+  "theme_color": "#63a832",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

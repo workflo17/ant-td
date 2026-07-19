@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ant-td",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["C:/Users/donfl/games/ant-td/serve.py", "5410", "C:/Users/donfl/games/ant-td"],
+      "port": 5410
+    }
+  ]
+}
