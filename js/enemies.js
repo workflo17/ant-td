@@ -1,7 +1,7 @@
 // ===== Enemy runtime: spawning, movement, layered damage, statuses =====
 import { ENEMIES, REGEN_CHAIN, REGEN_INTERVAL } from '../data/enemies.js';
 import { posAt, jitterColor } from './util.js';
-import { burst, ring, textPop, burstChunks } from './particles.js';
+import { burst, ring, textPop, burstChunks, popFx } from './particles.js';
 import { sfx } from './sound.js';
 
 const rbeCache = {};
@@ -171,6 +171,7 @@ function checkLastPop(game, e) {
 
 function popLayer(game, e) {
   const t = e.type;
+  popFx(e.x, e.y, t.color, t.radius, t.boss || t.shell); // flash + shock ring (+splatter for big bugs)
   if (t.boss) {
     burst(e.x, e.y, t.color, 22, 180);
     ring(e.x, e.y, '#ffffff', t.radius, 320, 0.4);

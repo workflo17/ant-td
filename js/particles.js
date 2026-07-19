@@ -89,6 +89,18 @@ export function tracer(x, y, x2, y2, color = '#d3ff5e') {
 export function slashFx(x, y, r, color = '#fff') {
   spawn({ kind: 'ring', x, y, r: r * 0.4, grow: r * 2.2, life: 0.16, color });
 }
+// the satisfying "pop": a quick small flash + a snappy white ring, plus colored splatter for big bugs
+export function popFx(x, y, color, radius, big) {
+  spawn({ kind: 'flash', x, y, r: radius * 1.0 + 3, life: 0.07 });
+  spawn({ kind: 'ring', x, y, r: radius * 0.5, grow: radius * 2.2 + 22, life: 0.2, color: '#ffffff' });
+  if (big) {
+    spawn({ kind: 'ring', x, y, r: radius * 0.4, grow: radius * 1.8 + 36, life: 0.34, color });
+    for (let i = 0; i < 6; i++) {
+      const a = Math.random() * TAU, d = radius * (0.3 + Math.random() * 0.8);
+      spawn({ kind: 'splat', x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, size: 2.5 + Math.random() * 3.5, color, rot: Math.random() * TAU, life: 0.5 + Math.random() * 0.45 });
+    }
+  }
+}
 
 export function updateParticles(dt) {
   if (dt <= 0) return;
@@ -144,6 +156,12 @@ export function drawParticles(ctx) {
       ctx.fillStyle = `rgba(90,74,60,${0.35 * k})`;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size * (1.4 - k * 0.4), 0, TAU);
+      ctx.fill();
+    } else if (p.kind === 'splat') {
+      ctx.globalAlpha = k * 0.85;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.size, p.size * 0.7, p.rot, 0, TAU);
       ctx.fill();
     } else if (p.kind === 'line') {
       ctx.strokeStyle = p.color;
