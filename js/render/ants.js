@@ -271,24 +271,40 @@ export function drawAnt(c, typeId, def, opts) {
   // mandibles / weapons
   const headFront = hy0 - P.head + 1;
   if (typeId === 'trapjaw') {
-    // trap-jaws snap 180°: huge toothed arcs, mirrored exactly via scale(-1,1)
-    const open = flash > 0 ? 0.12 : 0.7;
+    // heavy serrated sickle mandibles: solid chitin blades that hook to a needle tip,
+    // fanged inner edge, cold sharpened rim — they snap shut on attack (flash)
+    const open = flash > 0 ? 0.32 : 0.72;
+    const baseX = 1.4 + open * 4.4;      // splay wide when open, converge on the snap
+    const tilt = (0.42 - open) * 0.5;    // tips rake inward as the trap closes
     for (let side = -1; side <= 1; side += 2) {
       c.save();
       c.scale(side, 1);
-      c.strokeStyle = INK;
-      c.lineWidth = 3.6;
+      c.translate(baseX, headFront + 1);
+      c.rotate(tilt);
       c.beginPath();
-      c.arc(6.5 * open, headFront - 1, 8.5, -2.6, -0.5);
+      c.moveTo(0, 1);
+      c.quadraticCurveTo(10, -1, 12, -9);      // outer edge sweeps out & forward
+      c.quadraticCurveTo(12.6, -14, 8, -16.2); // hook to the sharp tip
+      c.lineTo(7.4, -12.4);                     // inner fanged edge back down
+      c.lineTo(4.8, -13.2);                     // fang 1
+      c.lineTo(6, -9);
+      c.lineTo(3.1, -9.4);                      // fang 2
+      c.lineTo(4.4, -5.2);
+      c.lineTo(1.7, -5);                        // fang 3
+      c.lineTo(3, -1);
+      c.closePath();
+      c.fillStyle = dark;
+      c.fill();
+      c.lineWidth = 2.4;
+      c.strokeStyle = INK;
       c.stroke();
-      c.lineWidth = 1.8;
-      for (let tt = 0; tt < 2; tt++) {
-        const ta = -2.1 + tt * 0.55;
-        c.beginPath();
-        c.moveTo(6.5 * open + Math.cos(ta) * 8.5, headFront - 1 + Math.sin(ta) * 8.5);
-        c.lineTo(6.5 * open + Math.cos(ta) * 11, headFront - 1 + Math.sin(ta) * 11);
-        c.stroke();
-      }
+      // cold rim-light down the outer edge reads as a sharpened blade
+      c.strokeStyle = 'rgba(226,236,255,0.42)';
+      c.lineWidth = 1.3;
+      c.beginPath();
+      c.moveTo(1.6, 0.4);
+      c.quadraticCurveTo(9.6, -1.6, 11.4, -8.6);
+      c.stroke();
       c.restore();
     }
   } else if (typeId === 'archer') {
