@@ -308,13 +308,30 @@ export function drawAnt(c, typeId, def, opts) {
       c.restore();
     }
   } else if (typeId === 'archer') {
-    // long acid barrel with muzzle ring
-    c.strokeStyle = dark;
-    c.lineWidth = 5;
-    c.beginPath(); c.moveTo(0, headFront); c.lineTo(0, headFront - 14); c.stroke();
-    c.strokeStyle = INK; c.lineWidth = 2;
-    c.beginPath(); c.moveTo(0, headFront); c.lineTo(0, headFront - 14); c.stroke();
-    c.beginPath(); c.arc(0, headFront - 14, 2.6, 0, TAU); c.stroke();
+    // sleek acid sniper: long tapered barrel, scope, dripping green muzzle
+    const by = headFront;
+    c.save();
+    c.rotate(-0.1); // held at a marksman's slight cant
+    c.lineCap = 'round';
+    // barrel
+    c.strokeStyle = dark; c.lineWidth = 5.5;
+    c.beginPath(); c.moveTo(0, by + 2); c.lineTo(0, by - 18); c.stroke();
+    c.strokeStyle = INK; c.lineWidth = 2.2;
+    c.beginPath(); c.moveTo(0, by + 2); c.lineTo(0, by - 18); c.stroke();
+    // muzzle brake vents
+    c.lineWidth = 1.8;
+    c.beginPath(); c.moveTo(-2.8, by - 15.5); c.lineTo(2.8, by - 15.5); c.stroke();
+    c.beginPath(); c.moveTo(-2.4, by - 12.8); c.lineTo(2.4, by - 12.8); c.stroke();
+    // scope
+    c.fillStyle = INK; c.fillRect(-1.6, by - 9.5, 3.2, 5);
+    c.fillStyle = '#8fd3e8';
+    c.beginPath(); c.arc(0, by - 9, 1.1, 0, TAU); c.fill();
+    // acid globule at the muzzle
+    c.fillStyle = '#9be34a'; c.strokeStyle = INK; c.lineWidth = 1.4;
+    c.beginPath(); c.arc(0, by - 18, 2.4, 0, TAU); c.fill(); c.stroke();
+    c.fillStyle = '#d7fb7a';
+    c.beginPath(); c.arc(-0.7, by - 18.7, 0.9, 0, TAU); c.fill();
+    c.restore();
   } else if (typeId === 'army') {
     // hooked war-jaws
     c.strokeStyle = INK;
