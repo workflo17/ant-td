@@ -267,12 +267,16 @@ export function drawBugBody(c, e, time) {
     c.beginPath(); c.moveTo(rx * 0.7, -ey - er); c.lineTo(rx * 1.05, -ey + 1); c.stroke();
     c.beginPath(); c.moveTo(rx * 0.7, ey + er); c.lineTo(rx * 1.05, ey - 1); c.stroke();
   } else {
-    c.fillStyle = '#fff';
-    c.beginPath(); c.arc(rx * 0.95, -ry * 0.22, 2.6, 0, TAU); c.fill();
-    c.beginPath(); c.arc(rx * 0.95, ry * 0.22, 2.6, 0, TAU); c.fill();
-    c.fillStyle = INK;
-    c.beginPath(); c.arc(rx * 1.02, -ry * 0.22, 1.2, 0, TAU); c.fill();
-    c.beginPath(); c.arc(rx * 1.02, ry * 0.22, 1.2, 0, TAU); c.fill();
+    // dark compound eyes on the head sides — matches the ants, no more cartoon pupils
+    const er = Math.min(3, Math.max(1.7, ry * 0.26));
+    for (let side = -1; side <= 1; side += 2) {
+      const ex = rx * 0.96, ey = side * ry * 0.22;
+      c.fillStyle = '#180d07';
+      c.beginPath(); c.ellipse(ex, ey, er * 0.85, er, 0, 0, TAU); c.fill();
+      c.strokeStyle = INK; c.lineWidth = 0.9; c.stroke();
+      c.fillStyle = 'rgba(255,255,255,0.5)';
+      c.beginPath(); c.arc(ex - 0.7, ey - er * 0.4, er * 0.3, 0, TAU); c.fill();
+    }
   }
   // hornet queen's crown
   if (id === 'hornetQueen') {
