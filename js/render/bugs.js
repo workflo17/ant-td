@@ -250,20 +250,19 @@ export function drawBugBody(c, e, time) {
     c.beginPath(); c.moveTo(rx * 1.1, 0); c.lineTo(rx * 1.6, 0); c.stroke();
   }
 
-  // eyes — bosses get bigger, glowing menace eyes with an angry brow
+  // eyes — bosses get bigger DARK compound eyes with a faint menacing ember + angry brow
   if (t.boss) {
-    const ex = rx * 0.95, ey = ry * 0.24, er = 3.4;
+    const ex = rx * 0.95, ey = ry * 0.26, er = 3.6;
     for (let side = -1; side <= 1; side += 2) {
-      c.fillStyle = 'rgba(255,60,30,0.35)'; // hot glow halo
-      c.beginPath(); c.arc(ex, side * ey, er + 2.2, 0, TAU); c.fill();
-      c.fillStyle = '#ffe08a';
-      c.beginPath(); c.arc(ex, side * ey, er, 0, TAU); c.fill();
-      c.fillStyle = '#e2331a';
-      c.beginPath(); c.arc(ex + 0.6, side * ey, er * 0.62, 0, TAU); c.fill();
-      c.fillStyle = INK;
-      c.beginPath(); c.arc(ex + 1, side * ey, er * 0.3, 0, TAU); c.fill();
+      c.fillStyle = '#160b06'; // dark compound eye (menace comes from the brow, not a glow)
+      c.beginPath(); c.ellipse(ex, side * ey, er * 0.82, er, 0, 0, TAU); c.fill();
+      c.strokeStyle = INK; c.lineWidth = 1.2; c.stroke();
+      c.fillStyle = 'rgba(208,48,24,0.5)'; // faint ember deep inside
+      c.beginPath(); c.arc(ex + 0.5, side * ey, er * 0.42, 0, TAU); c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.4)'; // reflective glint
+      c.beginPath(); c.arc(ex - 0.7, side * ey - er * 0.4, er * 0.26, 0, TAU); c.fill();
     }
-    // angry brow ridges
+    // angry brow ridges — menace via shape, not glow
     c.strokeStyle = INK; c.lineWidth = 2.4;
     c.beginPath(); c.moveTo(rx * 0.7, -ey - er); c.lineTo(rx * 1.05, -ey + 1); c.stroke();
     c.beginPath(); c.moveTo(rx * 0.7, ey + er); c.lineTo(rx * 1.05, ey - 1); c.stroke();

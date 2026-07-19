@@ -226,10 +226,17 @@ export function drawAnt(c, typeId, def, opts) {
     c.strokeStyle = INK;
   }
 
-  // petiole: the pinched ant waist
+  // petiole: the pinched ant waist. Myrmicine castes (the Majoress, an Atta-like major)
+  // have TWO nodes — petiole + postpetiole; Formicines get the single node.
+  const pyy = P.th[1] * 0.62 + 1.5;
   c.fillStyle = bodyGrad(c, col, dark, 3);
   c.lineWidth = 2;
-  c.beginPath(); c.arc(0, P.th[1] * 0.62 + 1.5, 2.7, 0, TAU); c.fill(); c.stroke();
+  if (typeId === 'majoress') {
+    c.beginPath(); c.arc(0, pyy - 0.6, 2.3, 0, TAU); c.fill(); c.stroke();
+    c.beginPath(); c.arc(0, pyy + 3, 2.6, 0, TAU); c.fill(); c.stroke();
+  } else {
+    c.beginPath(); c.arc(0, pyy, 2.7, 0, TAU); c.fill(); c.stroke();
+  }
 
   // hero regalia sits behind the thorax
   if (typeId === 'hero' && opts.hero === 'formica') {
@@ -286,40 +293,35 @@ export function drawAnt(c, typeId, def, opts) {
   // mandibles / weapons
   const headFront = hy0 - P.head + 1;
   if (typeId === 'trapjaw') {
-    // heavy serrated sickle mandibles: solid chitin blades that hook to a needle tip,
-    // fanged inner edge, cold sharpened rim — they snap shut on attack (flash)
-    const open = flash > 0 ? 0.32 : 0.72;
-    const baseX = 1.4 + open * 4.4;      // splay wide when open, converge on the snap
-    const tilt = (0.42 - open) * 0.5;    // tips rake inward as the trap closes
+    // Odontomachus trap-jaws: long, thin, STRAIGHT linear mandibles with fine inner teeth
+    // and a terminal tooth — latched wide open at rest, snapping nearly shut on attack.
+    const open = flash > 0 ? 0.06 : 0.6;      // 0 = snapped forward, 1 = splayed ~90° apart
+    const spread = 0.18 + open * 1.05;         // radians each jaw angles outward from forward
+    const len = 18;
     for (let side = -1; side <= 1; side += 2) {
       c.save();
       c.scale(side, 1);
-      c.translate(baseX, headFront + 1);
-      c.rotate(tilt);
+      c.translate(2.2, headFront + 1);
+      c.rotate(spread);
+      // thin tapered straight blade with a hooked terminal tooth
       c.beginPath();
-      c.moveTo(0, 1);
-      c.quadraticCurveTo(10, -1, 12, -9);      // outer edge sweeps out & forward
-      c.quadraticCurveTo(12.6, -14, 8, -16.2); // hook to the sharp tip
-      c.lineTo(7.4, -12.4);                     // inner fanged edge back down
-      c.lineTo(4.8, -13.2);                     // fang 1
-      c.lineTo(6, -9);
-      c.lineTo(3.1, -9.4);                      // fang 2
-      c.lineTo(4.4, -5.2);
-      c.lineTo(1.7, -5);                        // fang 3
-      c.lineTo(3, -1);
+      c.moveTo(-1.3, 1);
+      c.lineTo(-1.0, -len);
+      c.lineTo(0.4, -len - 2.8);   // terminal tooth
+      c.lineTo(1.4, -len + 1);
+      c.lineTo(1.6, 0.5);
       c.closePath();
-      c.fillStyle = dark;
-      c.fill();
-      c.lineWidth = 2.4;
-      c.strokeStyle = INK;
-      c.stroke();
-      // cold rim-light down the outer edge reads as a sharpened blade
-      c.strokeStyle = 'rgba(226,236,255,0.42)';
-      c.lineWidth = 1.3;
-      c.beginPath();
-      c.moveTo(1.6, 0.4);
-      c.quadraticCurveTo(9.6, -1.6, 11.4, -8.6);
-      c.stroke();
+      c.fillStyle = dark; c.fill();
+      c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+      // fine teeth along the inner (mesal) edge
+      c.lineWidth = 1;
+      for (let k = 1; k <= 3; k++) {
+        const ty = -len * (0.28 + k * 0.18);
+        c.beginPath(); c.moveTo(-1.0, ty); c.lineTo(-2.7, ty + 0.9); c.stroke();
+      }
+      // rim light down the outer edge
+      c.strokeStyle = 'rgba(226,236,255,0.4)';
+      c.beginPath(); c.moveTo(1.2, 0); c.lineTo(1.0, -len + 1); c.stroke();
       c.restore();
     }
   } else if (typeId === 'archer') {
@@ -498,6 +500,14 @@ export function drawAnt(c, typeId, def, opts) {
     c.strokeStyle = 'rgba(143,211,232,0.9)'; c.lineWidth = 1;
     c.beginPath(); c.moveTo(ex - eyeR, ey); c.lineTo(ex + eyeR, ey); c.stroke();
     c.beginPath(); c.moveTo(ex, ey - eyeR); c.lineTo(ex, ey + eyeR); c.stroke();
+  }
+  // royal caste (Majoress) carries three ocelli — simple eyes — in a triangle on the vertex
+  if (typeId === 'majoress') {
+    const oc = [[0, hy0 - P.head * 0.5], [-P.head * 0.2, hy0 - P.head * 0.24], [P.head * 0.2, hy0 - P.head * 0.24]];
+    for (const [ox, oy] of oc) {
+      c.fillStyle = '#ffe08a'; c.strokeStyle = INK; c.lineWidth = 0.7;
+      c.beginPath(); c.arc(ox, oy, 1, 0, TAU); c.fill(); c.stroke();
+    }
   }
 
   // weaver holds a leaf in her jaws
