@@ -1109,6 +1109,27 @@ function drawCritters(time) {
 
 // ---------- main draw ----------
 
+// polished range/reticle indicator: soft filled disc + crisp inner ring + rotating dashed rim
+function rangeRing(x, y, r, rgb, time) {
+  ctx.save();
+  const g = ctx.createRadialGradient(x, y, Math.max(1, r * 0.5), x, y, r);
+  g.addColorStop(0, `rgba(${rgb},0.03)`);
+  g.addColorStop(0.82, `rgba(${rgb},0.10)`);
+  g.addColorStop(1, `rgba(${rgb},0.22)`);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  ctx.strokeStyle = `rgba(${rgb},0.35)`;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(x, y, r - 1.6, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = `rgba(${rgb},0.95)`;
+  ctx.lineWidth = 2.6;
+  ctx.setLineDash([11, 7]);
+  ctx.lineDashOffset = -time * 20;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
 export function draw(game, ui, time) {
   if (!ctx) return;
   const rdt = Math.min(0.1, time - lastDrawTime);
@@ -1397,15 +1418,9 @@ export function draw(game, ui, time) {
   if (ui.selected && game.towers.includes(ui.selected)) {
     const t = ui.selected;
     const r = t.stats.range;
-    if (r && r < 9000) {
-      ctx.fillStyle = 'rgba(245,166,35,0.10)';
-      ctx.strokeStyle = 'rgba(245,166,35,0.8)';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([8, 6]);
-      ctx.beginPath(); ctx.arc(t.x, t.y, r, 0, TAU); ctx.fill(); ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    ctx.strokeStyle = '#fff';
+    if (r && r < 9000) rangeRing(t.x, t.y, r, '245,166,35', time);
+    // crisp white footprint collar so the selected ant reads as picked
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
     ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(t.x, t.y, t.def.footprint + 4, 0, TAU); ctx.stroke();
   }
@@ -1413,14 +1428,8 @@ export function draw(game, ui, time) {
   // power-casting reticle (decoy shows its white eat-radius)
   if (ui.casting && ui.ghostX != null) {
     const r = ui.casting === 'rain' ? 85 : ui.casting === 'decoy' ? 70 : 55;
-    ctx.fillStyle = ui.casting === 'rain' ? 'rgba(155,227,74,0.15)'
-      : ui.casting === 'decoy' ? 'rgba(255,255,255,0.14)' : 'rgba(255,157,138,0.15)';
-    ctx.strokeStyle = ui.casting === 'rain' ? 'rgba(155,227,74,0.9)'
-      : ui.casting === 'decoy' ? 'rgba(255,255,255,0.9)' : 'rgba(226,118,42,0.9)';
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([8, 6]);
-    ctx.beginPath(); ctx.arc(ui.ghostX, ui.ghostY, r, 0, TAU); ctx.fill(); ctx.stroke();
-    ctx.setLineDash([]);
+    const rgb = ui.casting === 'rain' ? '155,227,74' : ui.casting === 'decoy' ? '245,240,255' : '255,157,138';
+    rangeRing(ui.ghostX, ui.ghostY, r, rgb, time);
   }
 
   // mounds glow while placing: fight for the high ground
@@ -1439,10 +1448,10 @@ export function draw(game, ui, time) {
     const def = ui.placingDef;
     const r = def.base.range && def.base.range < 9000 ? def.base.range : 60;
     const ok = ui.ghostValid;
-    ctx.fillStyle = ok ? 'rgba(106,176,76,0.16)' : 'rgba(226,71,47,0.16)';
-    ctx.strokeStyle = ok ? 'rgba(106,176,76,0.85)' : 'rgba(226,71,47,0.85)';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(ui.ghostX, ui.ghostY, r, 0, TAU); ctx.fill(); ctx.stroke();
+    rangeRing(ui.ghostX, ui.ghostY, r, ok ? '106,176,76' : '226,71,47', time);
+    // a soft ground shadow so the ghost ant reads as hovering, about to drop
+    ctx.fillStyle = 'rgba(43,26,16,0.16)';
+    ctx.beginPath(); ctx.ellipse(ui.ghostX + 2, ui.ghostY + 10, def.footprint * 0.9, def.footprint * 0.4, 0, 0, TAU); ctx.fill();
     ctx.globalAlpha = 0.7;
     drawAnt(ctx, ui.placingType, def, { x: ui.ghostX, y: ui.ghostY, time });
     ctx.globalAlpha = 1;
