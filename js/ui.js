@@ -199,6 +199,27 @@ export function init() {
   els.btnTitleSound.addEventListener('click', () => { toggleMute(); refreshTitle(); });
   document.getElementById('btn-title-settings').addEventListener('click', showSettings);
 
+  // the front door wears the game: a real drawn ant parade under golden-hour light
+  const parade = document.getElementById('title-parade');
+  if (parade) {
+    const c = parade.getContext('2d');
+    const gr = c.createLinearGradient(0, 92, 0, 30);
+    gr.addColorStop(0, 'rgba(43,26,16,0.22)'); // long ground shade
+    gr.addColorStop(1, 'rgba(43,26,16,0)');
+    c.fillStyle = gr;
+    c.fillRect(0, 30, 400, 62);
+    const cast = [['worker', 1.15], ['trapjaw', 1.25], ['majoress', 1.4], ['weaver', 1.15]];
+    cast.forEach(([ty, scale], i) => {
+      c.save();
+      c.translate(58 + i * 96, 52 + (i % 2) * 6);
+      // stretched golden-hour shadow trailing each marcher
+      c.fillStyle = 'rgba(43,26,16,0.25)';
+      c.beginPath(); c.ellipse(-14, 14, 26, 7, -0.12, 0, Math.PI * 2); c.fill();
+      c.restore();
+      drawAnt(c, ty, TOWERS[ty], { x: 58 + i * 96, y: 52 + (i % 2) * 6, angle: 0, time: i * 1.7, bob: i * 2.3, scale });
+    });
+  }
+
   // tiny build stamp (confirms a phone isn't stuck on a stale cached version)
   const tag = document.createElement('div');
   tag.id = 'build-tag';
@@ -446,7 +467,7 @@ function mapLocked(map) {
 }
 
 // ---- THE BACKYARD TRAIL: a journey view over the campaign (cards remain as a list toggle) ----
-let mapView = 'trail'; // 'trail' | 'list'
+let mapView = 'list'; // 'list' | 'trail' — cards pick faster; the trail is the showpiece view
 
 // node centers as % of the trail strip, winding left → right across the backyard
 const TRAIL_POS = {
@@ -641,10 +662,27 @@ export function renderMenu() {
     els.trail = document.createElement('div');
     els.trail.id = 'trail';
     scroll.appendChild(els.trail);
+    els.trailWrap.append(head, scroll);
+    els.mapCards.parentNode.insertBefore(els.trailWrap, els.mapCards);
+    // star rewards are trophy-case content — they live BELOW the start buttons,
+    // out of the map→difficulty→go decision column
     els.srStrip = document.createElement('div');
     els.srStrip.id = 'star-rewards';
-    els.trailWrap.append(head, scroll, els.srStrip);
-    els.mapCards.parentNode.insertBefore(els.trailWrap, els.mapCards);
+    const foot = document.querySelector('.menu-foot');
+    els.btnPlay.parentNode.insertBefore(els.srStrip, foot);
+    // the decision column ends in a dock that stays visible while the page scrolls
+    els.ctaDock = document.createElement('div');
+    els.ctaDock.id = 'cta-dock';
+    els.btnPlay.parentNode.insertBefore(els.ctaDock, els.btnPlay);
+    els.ctaDock.appendChild(els.btnPlay);
+    // settings, reachable where the decisions are
+    const gear = document.createElement('button');
+    gear.className = 'sticker mini-btn menu-settings';
+    gear.textContent = '⚙️';
+    gear.setAttribute('aria-label', 'Settings');
+    gear.title = 'Settings';
+    gear.addEventListener('click', showSettings);
+    els.screenMenu.appendChild(gear);
   }
   els.viewToggle.textContent = mapView === 'trail' ? '🗂 card list' : '🗺 trail view';
   els.trail.parentNode.classList.toggle('hidden', mapView !== 'trail');
@@ -674,13 +712,18 @@ export function renderMenu() {
     }
     els.mapCards.appendChild(card);
   }
-  els.diffRow.innerHTML = '';
+  els.diffRow.innerHTML = '<span class="diff-label">DIFFICULTY</span>';
   for (const key of ['easy', 'medium', 'hard']) {
     const b = document.createElement('button');
     b.className = 'diff-btn sticker' + (key === selDiff ? ' selected' : '');
     b.textContent = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }[key];
     b.addEventListener('click', () => { selDiff = key; renderMenu(); });
     els.diffRow.appendChild(b);
+  }
+  // the commit button names the commitment: map + difficulty, always in sight
+  {
+    const selMap = MAPS.find(m => m.id === selMapId) || MAPS[0];
+    els.btnPlay.textContent = `🐜 Defend ${selMap.name} — ${selDiff === 'easy' ? 'Easy' : selDiff === 'medium' ? 'Medium' : 'Hard'}!`;
   }
   // collapsible "Loadout" section: hero picker + challenges tuck behind one sticker
   if (!els.loadoutWrap) {
@@ -700,7 +743,7 @@ export function renderMenu() {
     const modStr = activeMods.length
       ? `${activeMods.map(m => m.icon).join('')} ${activeMods.length} challenge${activeMods.length > 1 ? 's' : ''}`
       : 'no challenges';
-    els.loadoutBtn.innerHTML = `${loadoutOpen ? '▾' : '▸'} LOADOUT — ⭐ ${HEROES[selHero].short || HEROES[selHero].name} · ${modStr}`;
+    els.loadoutBtn.innerHTML = `${loadoutOpen ? '▾' : '▸'} ⭐ Hero &amp; Challenges — ${HEROES[selHero].short || HEROES[selHero].name} · ${modStr}`;
     els.loadoutBtn.setAttribute('aria-expanded', String(loadoutOpen));
     els.loadoutBody.classList.toggle('open', loadoutOpen);
   }
@@ -1040,8 +1083,9 @@ function toMenu() {
   checkRivalOutcome(); // leaving a daily run mid-flight still settles the rivalry
   stopPlacing();
   uiState.selected = null;
-  renderMenu(); // keep the levels screen fresh (best rounds, medals, resume) for when it's opened
-  showTitle();  // land on the clean front door, not the dense levels screen
+  game = null;
+  hideModal();
+  showLevels(); // land where the decisions are — Title stays the cold-start front door
 }
 
 const DIFF_LABEL = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
@@ -1061,17 +1105,17 @@ function buildHud() {
     <div class="hud-chip round" title="Round">🌊 <b id="hud-round-val">1/40</b></div>
     <button id="btn-start" class="sticker hud-btn primary">▶ Start round 1</button>
     <label class="hud-auto" title="Auto-start the next round"><input type="checkbox" id="chk-auto"> auto</label>
-    <button id="btn-ability" class="sticker hud-btn ability hidden" title="Hero ability (A)">⚡</button>
-    <button id="btn-ability2" class="sticker hud-btn ability hidden" title="Second hero ability (S) — unlocks at hero level 7">✨</button>
-    <button id="btn-rain" class="sticker hud-btn power" title="Acid Rain (Q) — drop an acid strike anywhere. Armored bugs shrug it off.">☄️</button>
-    <button id="btn-guards" class="sticker hud-btn power" title="Guard Detail (E) — soldier ants hold a spot for 8s, biting and stalling ground bugs.">🛡️</button>
-    <button id="btn-decoy" class="sticker hud-btn power decoy" title="Sugar Decoy (D) — drop a sugar cube on the grass: ground bugs stop and eat it until it crumbles. Max 2 out; bosses and flyers ignore it.">🧊</button>
+    <button id="btn-ability" class="sticker hud-btn ability hidden" title="Hero ability (A)" aria-label="Hero ability">⚡</button>
+    <button id="btn-ability2" class="sticker hud-btn ability hidden" title="Second hero ability (S) — unlocks at hero level 7" aria-label="Second hero ability">✨</button>
+    <button id="btn-rain" class="sticker hud-btn power" title="Acid Rain (Q) — drop an acid strike anywhere. Armored bugs shrug it off." aria-label="Acid Rain">☄️</button>
+    <button id="btn-guards" class="sticker hud-btn power" title="Guard Detail (E) — soldier ants hold a spot for 8s, biting and stalling ground bugs." aria-label="Guard Detail">🛡️</button>
+    <button id="btn-decoy" class="sticker hud-btn power decoy" title="Sugar Decoy (D) — drop a sugar cube on the grass: ground bugs stop and eat it until it crumbles. Max 2 out; bosses and flyers ignore it." aria-label="Sugar Decoy">🧊</button>
     <div class="hud-spacer"></div>
-    <button id="btn-speed" class="sticker hud-btn" title="Game speed (F)">1×</button>
-    <button id="btn-pause" class="sticker hud-btn" title="Pause (P)">⏸</button>
-    <button id="btn-music" class="sticker hud-btn" title="Music on/off">${isMusicMuted() ? '🔕' : '🎵'}</button>
-    <button id="btn-mute" class="sticker hud-btn" title="Mute SFX (M)">${isMuted() ? '🔇' : '🔊'}</button>
-    <button id="btn-menu" class="sticker hud-btn" title="Back to menu">🏠</button>`;
+    <button id="btn-speed" class="sticker hud-btn" title="Game speed (F)" aria-label="Game speed">1×</button>
+    <button id="btn-pause" class="sticker hud-btn" title="Pause (P)" aria-label="Pause">⏸</button>
+    <button id="btn-music" class="sticker hud-btn" title="Music on/off" aria-label="Music on or off">${isMusicMuted() ? '🔕' : '🎵'}</button>
+    <button id="btn-mute" class="sticker hud-btn" title="Mute SFX (M)" aria-label="Mute sound effects">${isMuted() ? '🔇' : '🔊'}</button>
+    <button id="btn-menu" class="sticker hud-btn" title="Back to level select" aria-label="Back to level select">🏠</button>`;
   els.sugarVal = document.getElementById('hud-sugar-val');
   els.crumbsVal = document.getElementById('hud-crumbs-val');
   els.roundVal = document.getElementById('hud-round-val');
