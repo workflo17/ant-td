@@ -838,6 +838,34 @@ html, body {
   font-size: 12px; font-weight: 900; animation: pulse 1.4s infinite;
 }
 
+/* every other dialog wears label-gold too — the win title keeps the sheen crown,
+   the lose title keeps its ember red, so those two exclude themselves here */
+.modal-title:not(.win):not(.lose) {
+  background: linear-gradient(180deg, #fff1bd 0%, #ffcf5a 52%, #f2a41b 100%);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 1.2px var(--ink);
+  paint-order: stroke fill;
+  filter: drop-shadow(1.5px 2px 0 rgba(43, 26, 16, 0.85));
+}
+
+/* toasts, species cards and coach bubbles sit off the page like the cards do */
+.ach-toast, .bug-card, #coach, #coach-camo, #coach-decoy {
+  box-shadow: 4px 4px 0 rgba(43, 26, 16, 0.85), 0 12px 26px rgba(20, 12, 4, 0.35);
+}
+/* coach bubbles pop in once, then keep their attention pulse */
+#coach, #coach-camo, #coach-decoy {
+  animation: coach-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both, pulse 1.4s 0.35s infinite;
+}
+@keyframes coach-pop {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; }
+}
+/* the forage draft deals its three options like cards off a deck */
+.draft-card { animation: card-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+.draft-card:nth-child(2) { animation-delay: 0.07s; }
+.draft-card:nth-child(3) { animation-delay: 0.14s; }
+
 /* the end cards deal their lines one at a time */
 #modal.win #modal-card > *, #modal.lose #modal-card > * {
   animation: title-rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1.15) both;

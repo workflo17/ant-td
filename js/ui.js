@@ -1414,6 +1414,11 @@ function updateCoach() {
   if (coachStep !== step) {
     coachStep = step;
     el.textContent = text;
+    // a small re-pop marks each new instruction (the birth pop is CSS coach-pop)
+    if (!motionReduced() && el.animate) {
+      el.animate([{ transform: 'scale(0.92)' }, { transform: 'scale(1)' }],
+        { duration: 200, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)' });
+    }
     // bring the pointed-at element on screen (stacked layouts push the panel below the fold)
     if (target.scrollIntoView) {
       const r = target.getBoundingClientRect();
