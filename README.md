@@ -9,6 +9,11 @@ guided tutorial walks you through your first round.
 > which map & round, what you were doing, and what felt off (too easy/hard, confusing,
 > ugly, a bug). Rough notes are fine — even "the menu confused me" helps.
 
+![A boss fight on the picnic map: a full roster of star-ranked ant towers defends the trail while a wasp closes in](assets/screenshots/picnic-boss-fight.png)
+
+| ![The Caterpillar boss, health bar at full, pushes a packed swarm of layered bugs down the trail](assets/screenshots/caterpillar-push.png) | ![Night rounds on the lantern-lit porch map](assets/screenshots/night-porch.png) |
+|---|---|
+
 ---
 
 A Bloons-style tower defense: pest bugs march a pheromone trail toward the colony's
