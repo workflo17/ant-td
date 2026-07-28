@@ -343,7 +343,11 @@ html, body {
   text-shadow: 1px 1px 0 var(--ink), -1px -1px 0 var(--ink), 1px -1px 0 var(--ink), -1px 1px 0 var(--ink);
 }
 .diff-btn { padding: 8px 26px; font-size: 16px; }
-.diff-btn.selected { background: #ffe9a8; transform: rotate(-1.5deg) scale(1.08); }
+.diff-btn.selected { background-color: #ffe9a8; transform: rotate(-1.5deg) scale(1.08); }
+/* the pick tells you what you signed up for: gentle green, honey, or trouble */
+.diff-btn.selected.easy { background-color: #cdeaa8; }
+.diff-btn.selected.medium { background-color: #ffe9a8; }
+.diff-btn.selected.hard { background-color: #ffbfa8; box-shadow: 0 0 0 2.5px var(--red), 4px 4px 0 rgba(43, 26, 16, 0.85); }
 
 /* the commitment dock: map + difficulty + go, pinned while the page scrolls.
    Its shade is an oversized soft pool (::before overhangs the column and fades to
@@ -550,7 +554,7 @@ html, body {
 
 .perk-dots { color: var(--honey); letter-spacing: 2px; }
 .set-row { display: flex; align-items: center; gap: 12px; margin: 12px 0; font-weight: 700; }
-.set-row span { width: 100px; text-align: left; }
+.set-row span { width: 128px; text-align: left; line-height: 1.15; }
 .set-row input[type="range"] { flex: 1; accent-color: var(--honey); height: 22px; }
 
 #coach, #coach-camo, #coach-decoy {

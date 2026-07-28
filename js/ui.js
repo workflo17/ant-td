@@ -1026,7 +1026,7 @@ export function renderMenu() {
   els.diffRow.innerHTML = '<span class="diff-label">DIFFICULTY</span>';
   for (const key of ['easy', 'medium', 'hard']) {
     const b = document.createElement('button');
-    b.className = 'diff-btn sticker' + (key === selDiff ? ' selected' : '');
+    b.className = `diff-btn sticker ${key}` + (key === selDiff ? ' selected' : '');
     b.textContent = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }[key];
     b.addEventListener('click', () => { selDiff = key; renderMenu(); });
     els.diffRow.appendChild(b);
