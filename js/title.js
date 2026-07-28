@@ -39,6 +39,7 @@ const MENU_MOODS = {
 let menuMood = 'golden';
 let moodCv = null, prevMoodCv = null;
 let moodT = 1; // crossfade 0→1
+let moodParts = []; // per-mood signature particles (bubbles, amber motes)
 
 function bakeMood(mood) {
   const def = MENU_MOODS[mood];
@@ -62,6 +63,23 @@ function bakeMood(mood) {
   return mc;
 }
 
+// each hour owns one signature drift: soap bubbles under the skylight,
+// amber motes in the late sun (night's fireflies are the pollen, already there)
+function seedMoodParts() {
+  moodParts = [];
+  if (!W) return;
+  const rng = mulberry32(31);
+  if (menuMood === 'skylight') {
+    for (let k = 0; k < 8; k++) {
+      moodParts.push({ kind: 'bubble', x: rng() * W, y: H * (0.3 + rng() * 0.65), v: 12 + rng() * 10, r: 5 + rng() * 9, ph: rng() * 10 });
+    }
+  } else if (menuMood === 'late') {
+    for (let k = 0; k < 9; k++) {
+      moodParts.push({ kind: 'mote', x: rng() * W, y: H * (0.25 + rng() * 0.55), v: 7 + rng() * 7, ph: rng() * 10 });
+    }
+  }
+}
+
 export function setMenuMood(mood) {
   const key = MENU_MOODS[mood] !== undefined ? mood : 'golden';
   if (key === menuMood) return;
@@ -69,6 +87,7 @@ export function setMenuMood(mood) {
   menuMood = key;
   moodCv = bakeMood(key);
   moodT = 0;
+  seedMoodParts();
   if (reduced && variant === 'menu' && cv) { moodT = 1; prevMoodCv = null; drawStatic(); }
 }
 
@@ -214,6 +233,7 @@ function bakeAll() {
   moodCv = bakeMood(menuMood);
   prevMoodCv = null;
   moodT = 1;
+  seedMoodParts();
 
   // --- ambient particles (menu: a quieter drift) ---
   seeds = []; pollen = [];
@@ -339,6 +359,31 @@ function frame(now) {
       ctx.globalAlpha = 1;
     }
     if (moodT >= 1) prevMoodCv = null;
+    // the hour's signature drift rides above its grade
+    for (const mp of moodParts) {
+      if (mp.kind === 'bubble') {
+        if (!reduced) {
+          mp.y -= mp.v * 0.016;
+          mp.x += Math.sin(t * 0.9 + mp.ph) * 0.4;
+          if (mp.y < -14) { mp.y = H + 14; mp.x = Math.random() * W; }
+        }
+        ctx.globalAlpha = 0.55 * moodT;
+        ctx.strokeStyle = 'rgba(235, 250, 255, 0.9)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(mp.x, mp.y, mp.r, 0, TAU); ctx.stroke();
+        ctx.beginPath(); ctx.arc(mp.x - mp.r * 0.35, mp.y - mp.r * 0.35, mp.r * 0.3, -2.4, -0.9); ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (mp.kind === 'mote') {
+        if (!reduced) {
+          mp.x -= mp.v * 0.016;
+          mp.y += Math.sin(t * 0.7 + mp.ph) * 0.25;
+          if (mp.x < -10) { mp.x = W + 10; mp.y = H * (0.25 + Math.random() * 0.55); }
+        }
+        const a = (0.3 + 0.3 * Math.sin(t * 1.3 + mp.ph)) * moodT;
+        ctx.fillStyle = `rgba(255, 190, 110, ${Math.max(0.12, a)})`;
+        ctx.beginPath(); ctx.ellipse(mp.x, mp.y, 3.2, 1.4, -0.2, 0, TAU); ctx.fill();
+      }
+    }
   }
 
   ctx.drawImage(postCv, 0, 0);

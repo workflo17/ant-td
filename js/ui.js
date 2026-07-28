@@ -93,6 +93,7 @@ const MOD_DEFS = [
 ];
 let lastEndModal = null;
 let lastCrumbsSeen = null; // crumb-loss flinch tracker (reset per game)
+let lastHeroLvl = null;    // hero level-up chip pop tracker (reset per game)
 
 // run score + grade; records the per-map:difficulty best as a side effect.
 // Called ONCE per run end — the result is captured so re-opening the end modal
@@ -241,6 +242,15 @@ function buildPostcard(sp) {
   c.font = "900 64px 'Baloo 2', sans-serif";
   c.fillText(grade, 0, 24);
   c.restore();
+  // the cast marches the front hill — the stars belong on their own poster
+  const CAST2 = [['worker', 1.3], ['trapjaw', 1.5], ['honeypot', 1.35]];
+  CAST2.forEach(([ty, sc], i) => {
+    const ax = 100 + i * 128, ay = 362 + (i % 2) * 4;
+    c.fillStyle = 'rgba(43, 26, 16, 0.3)';
+    c.beginPath(); c.ellipse(ax - 16, ay + 12, 24 * sc, 5.5 * sc, -0.1, 0, Math.PI * 2); c.fill();
+    drawAnt(c, ty, TOWERS[ty], { x: ax, y: ay, angle: 0, time: i * 1.7, scale: sc });
+  });
+  drawSugarCube(c, 100 + 2 * 128 + 14, 362 - 30, 7.5); // the honeypot's prize rides high
   // footer
   c.textAlign = 'center';
   c.font = "700 19px 'Baloo 2', sans-serif";
@@ -318,7 +328,9 @@ export function init() {
   els.btnPlay.addEventListener('click', (ev) => {
     unlockAudio();
     const map = MAPS.find(m => m.id === selMapId) || MAPS[0];
-    irisTo(() => startGame(map, selDiff), ev.clientX, ev.clientY);
+    const srcCv = document.querySelector('.map-card.selected canvas')
+      || document.querySelector('.trail-node.selected canvas');
+    morphToGame(() => startGame(map, selDiff), srcCv, map, ev.clientX, ev.clientY);
   });
   if (!els.forageBtn) {
     els.forageBtn = document.createElement('button');
@@ -480,6 +492,29 @@ function irisTo(go, x, y) {
     hole.style.transform = 'scale(0.001)';
     go();
     place(window.innerWidth / 2, window.innerHeight / 2);
+    // the ant punctuates the cut: a sticker-badged worker pops mid-cover
+    let mark = wrap.querySelector('.iris-ant');
+    if (!mark) {
+      mark = document.createElement('canvas');
+      mark.className = 'iris-ant';
+      mark.width = 84; mark.height = 84;
+      wrap.appendChild(mark);
+    }
+    mark.style.left = (window.innerWidth / 2 - 42) + 'px';
+    mark.style.top = (window.innerHeight / 2 - 42) + 'px';
+    const mc = mark.getContext('2d');
+    mc.clearRect(0, 0, 84, 84);
+    mc.fillStyle = '#fff3d6';
+    mc.strokeStyle = '#2b1a10';
+    mc.lineWidth = 3;
+    mc.beginPath(); mc.arc(42, 42, 35, 0, Math.PI * 2); mc.fill(); mc.stroke();
+    drawAnt(mc, 'worker', TOWERS.worker, { x: 42, y: 48, scale: 0.85, time: 2.2 });
+    mark.animate([
+      { opacity: 0, transform: 'scale(0.4) rotate(-8deg)' },
+      { opacity: 1, transform: 'scale(1) rotate(0deg)', offset: 0.35 },
+      { opacity: 1, transform: 'scale(1)', offset: 0.7 },
+      { opacity: 0, transform: 'scale(1.06)' },
+    ], { duration: 500, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)', fill: 'forwards' });
     let opened = false;
     const finish = () => {
       if (opened) return;
@@ -501,6 +536,68 @@ function irisTo(go, x, y) {
   };
   close.onfinish = doSwitch;
   setTimeout(doSwitch, 430);
+}
+
+// ---- the flagship transition: the chosen card GROWS into the board ----
+// The schematic preview flies to center stage over an ink scrim, the real game
+// bakes underneath, then the blueprint expands onto the actual board rect and
+// dissolves — the map you picked literally becomes the place you defend.
+// Falls back to the iris when there's no visible source (or reduced motion).
+function morphToGame(go, sourceCv, map, x, y) {
+  if (irisBusy || motionReduced() || !sourceCv || !sourceCv.isConnected) { irisTo(go, x, y); return; }
+  irisBusy = true;
+  sfx.iris();
+  let wrap = document.getElementById('morph');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'morph';
+    wrap.setAttribute('aria-hidden', 'true');
+    wrap.innerHTML = '<div id="morph-scrim"></div><canvas id="morph-card" width="360" height="240"></canvas>';
+    document.body.appendChild(wrap);
+  }
+  const scrim = wrap.firstElementChild;
+  const card = wrap.lastElementChild;
+  for (const el of [scrim, card]) if (el.getAnimations) el.getAnimations().forEach(a => a.cancel());
+  wrap.style.display = 'block';
+  drawMapPreview(card, map, false);
+  const src = sourceCv.getBoundingClientRect();
+  const rectKeys = (r) => ({ left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  const midW = Math.min(window.innerWidth * 0.6, 640);
+  const midH = midW * (src.height / src.width || 0.66);
+  const mid = { left: (window.innerWidth - midW) / 2, top: (window.innerHeight - midH) / 2, width: midW, height: midH };
+  scrim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out', fill: 'forwards' });
+  const flyA = card.animate(
+    [{ ...rectKeys(src), opacity: 1 }, { ...rectKeys(mid), opacity: 1 }],
+    { duration: 300, easing: 'cubic-bezier(0.4, 0, 0.6, 1)', fill: 'forwards' }
+  );
+  let switched = false;
+  const doSwitch = () => {
+    if (switched) return;
+    switched = true;
+    go();
+    setTimeout(() => {
+      const board = document.getElementById('game-canvas');
+      const dst = board ? board.getBoundingClientRect() : mid;
+      sfx.irisOpen();
+      const flyB = card.animate([
+        { ...rectKeys(mid), opacity: 1 },
+        { ...rectKeys(dst), opacity: 1, offset: 0.68 },
+        { ...rectKeys(dst), opacity: 0 },
+      ], { duration: 460, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' });
+      scrim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 380, delay: 140, easing: 'ease-out', fill: 'forwards' });
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        wrap.style.display = 'none';
+        irisBusy = false;
+      };
+      flyB.onfinish = finish;
+      setTimeout(finish, 760); // the screen may never stay covered
+    }, 30);
+  };
+  flyA.onfinish = doSwitch;
+  setTimeout(doSwitch, 380);
 }
 
 // re-running an entrance: the class only exists for the choreography window, so
@@ -837,6 +934,36 @@ function drawTrailEmblem(cv, map, locked) {
   c.restore();
 }
 
+// the colony flows through the backyard: dots march the trail-view path
+let trailMarchRaf = 0;
+
+function startTrailMarch(cv) {
+  cancelAnimationFrame(trailMarchRaf);
+  if (motionReduced()) return;
+  const pts = MAPS.map(m => {
+    const [px2, py2] = TRAIL_POS[m.id] || [50, 50];
+    return [(px2 / 100) * cv.width, (py2 / 100) * cv.height];
+  });
+  const total = pointAlong(pts, 0).total;
+  const loop = () => {
+    if (!cv.isConnected || cv.offsetParent === null) return; // gone or view hidden
+    drawTrailPath(cv);
+    const c = cv.getContext('2d');
+    const t = performance.now() / 1000;
+    c.fillStyle = 'rgba(43, 26, 16, 0.7)';
+    for (let i = 0; i < 5; i++) {
+      const p = pointAlong(pts, t * 34 + (i * total) / 5);
+      c.save();
+      c.translate(p.x, p.y + Math.sin(t * 8 + i * 1.9) * 0.8);
+      c.rotate(p.ang);
+      c.beginPath(); c.ellipse(0, 0, 4, 2.4, 0, 0, Math.PI * 2); c.fill();
+      c.restore();
+    }
+    trailMarchRaf = requestAnimationFrame(loop);
+  };
+  trailMarchRaf = requestAnimationFrame(loop);
+}
+
 function renderTrail() {
   els.trail.innerHTML = '';
   const cv = document.createElement('canvas');
@@ -845,6 +972,7 @@ function renderTrail() {
   cv.className = 'trail-path';
   els.trail.appendChild(cv);
   drawTrailPath(cv);
+  startTrailMarch(cv);
   const totalStars = backyardStars();
   const goldTrim = totalStars >= 12; // Golden Anthill reward
   for (const map of MAPS) {
@@ -1457,6 +1585,7 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
   game.autoStart = els.chkAuto.checked; // carry the visible toggle into the new game
   dispSugar = null;
   lastCrumbsSeen = null;
+  lastHeroLvl = null;
   renderShop();
   renderPanel();
 }
@@ -1659,6 +1788,20 @@ export function tick() {
   }
   lastCrumbsSeen = game.crumbs;
   els.crumbsVal.textContent = fmt(game.crumbs);
+  // the hero's level chip pops when they grow (if their panel is open)
+  if (game.hero) {
+    if (lastHeroLvl != null && game.hero.level > lastHeroLvl && !motionReduced()) {
+      const chip = document.querySelector('.hero-lvl');
+      if (chip && chip.animate) {
+        chip.animate([
+          { transform: 'scale(1)' }, { transform: 'scale(1.45) rotate(-5deg)' }, { transform: 'scale(1)' },
+        ], { duration: 420, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)' });
+      }
+    }
+    lastHeroLvl = game.hero.level;
+  } else {
+    lastHeroLvl = null;
+  }
   els.roundVal.textContent = game.round <= 40 && !game.freeplay
     ? `${game.state === 'inround' ? game.round : Math.min(game.round + 1, 40)}/40`
     : `${game.state === 'inround' ? game.round : game.round + 1} ∞`;
@@ -2501,6 +2644,22 @@ function driftEmbers(holder) {
   }
 }
 
+// a little iso sugar cube — the spoils the parade carries home
+function drawSugarCube(c, x, y, s) {
+  c.save();
+  c.translate(x, y);
+  c.strokeStyle = '#2b1a10';
+  c.lineWidth = Math.max(1.2, s * 0.28);
+  c.lineJoin = 'round';
+  c.fillStyle = '#fffdf6';
+  c.beginPath(); c.moveTo(0, -s); c.lineTo(s, -s * 0.5); c.lineTo(0, 0); c.lineTo(-s, -s * 0.5); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = '#eee7d8';
+  c.beginPath(); c.moveTo(-s, -s * 0.5); c.lineTo(0, 0); c.lineTo(0, s * 0.9); c.lineTo(-s, s * 0.4); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = '#f8f3e8';
+  c.beginPath(); c.moveTo(s, -s * 0.5); c.lineTo(0, 0); c.lineTo(0, s * 0.9); c.lineTo(s, s * 0.4); c.closePath(); c.fill(); c.stroke();
+  c.restore();
+}
+
 // the victory lap: the title's cast marches home with the spoils, behind the card
 let paradeRaf = 0;
 
@@ -2530,6 +2689,8 @@ function startWinParade(holder) {
       c.ellipse(ax - 20 * sc * 0.6, ay + 12 * sc * 0.45, 26 * sc * 0.7, 6 * sc * 0.5, -0.1, 0, Math.PI * 2);
       c.fill();
       drawAnt(c, ty, TOWERS[ty], { x: ax, y: ay + bob, angle: 0, time: t + i * 1.3, bob: i * 2.1, scale: sc });
+      // every other marcher hauls a cube of the defended stash, bobbing anti-phase
+      if (i % 2 === 1) drawSugarCube(c, ax + 4 * sc, ay + bob - 16 * sc - Math.sin(t * 3.1 + i * 1.8) * 1.4, 5.5 * sc);
     }
     paradeRaf = requestAnimationFrame(loop);
   };
