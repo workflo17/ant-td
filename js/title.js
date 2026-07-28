@@ -99,13 +99,13 @@ function bakeAll() {
   // --- blurred foreground foliage (depth of field) ---
   fgCv = document.createElement('canvas'); fgCv.width = W + 120; fgCv.height = H;
   const f = fgCv.getContext('2d');
-  f.filter = 'blur(6px)';
-  for (let k = 0; k < 9; k++) {
-    const bx = (k / 8) * (W + 120) + (rng() - 0.5) * 60;
-    const bh = H * (0.2 + rng() * 0.22);
-    const lean = (rng() - 0.5) * 90;
-    f.strokeStyle = k % 2 ? 'rgba(46,90,30,0.85)' : 'rgba(63,122,34,0.8)';
-    f.lineWidth = 10 + rng() * 10;
+  f.filter = 'blur(8px)';
+  for (let k = 0; k < 7; k++) {
+    const bx = (k / 6) * (W + 120) + (rng() - 0.5) * 60;
+    const bh = H * (0.09 + rng() * 0.12); // low tufts framing the bottom, not smudge-poles
+    const lean = (rng() - 0.5) * 70;
+    f.strokeStyle = k % 2 ? 'rgba(46,90,30,0.7)' : 'rgba(63,122,34,0.65)';
+    f.lineWidth = 8 + rng() * 8;
     f.lineCap = 'round';
     f.beginPath();
     f.moveTo(bx, H + 20);
@@ -190,7 +190,8 @@ function frame(now) {
   }
 
   // the parade: heroes on the front meadow, marching with long golden-hour shadows
-  const rowY = H * 0.84;
+  // (row sits below the menu's footer buttons so the cast never collides with the UI)
+  const rowY = H * 0.9;
   const drift = reduced ? 0 : (t * 10) % (W + 260);
   for (let i = 0; i < PARADE.length; i++) {
     const [ty2, sc] = PARADE[i];
