@@ -644,7 +644,8 @@ export class Game {
   leakEnemy(e) {
     e.dead = true;
     if (this.god) return;
-    const val = EN.leakValue(e);
+    // ceil: veteran ants deal fractional damage, but lives stay whole numbers
+    const val = Math.ceil(EN.leakValue(e));
     this.crumbs = Math.max(0, this.crumbs - val);
     this.stats.leaks += val;
     this.roundLeaks++;
