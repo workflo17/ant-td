@@ -143,14 +143,14 @@ export const TOWERS = {
 
   honeypot: {
     name: 'Honeypot Replete', cost: 300, footprint: 19, hotkey: '8',
-    tagline: 'A living sugar bank. Pays every round.',
+    tagline: 'A living sugar bank. Pays every round; extra pots pay less.',
     color: '#f5a623', dark: '#8a5a00',
     base: { attack: null, income: 60 },
     paths: {
       a: { name: 'Nectar', tiers: [
-        { name: 'Sweeter Nectar', cost: 180, desc: '+50 sugar per round', add: { income: 50 } },
-        { name: 'Bulging Reserves', cost: 380, desc: '+90 sugar per round', add: { income: 90 } },
-        { name: 'Royal Stockpile', cost: 850, desc: '+180 sugar per round', add: { income: 180 } },
+        { name: 'Sweeter Nectar', cost: 220, desc: '+50 sugar per round', add: { income: 50 } },
+        { name: 'Bulging Reserves', cost: 450, desc: '+90 sugar per round', add: { income: 90 } },
+        { name: 'Royal Stockpile', cost: 950, desc: '+180 sugar per round', add: { income: 180 } },
       ]},
       b: { name: 'Interest', tiers: [
         { name: 'Sugar Loans', cost: 200, desc: '+8% of your sugar each round (max 60)', set: { interest: 0.08, interestCap: 60 } },

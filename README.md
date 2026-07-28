@@ -115,7 +115,8 @@ js/debug.js           ?debug panel + TD scripting API
 
 All balance lives in `data/` — engine code never needs touching:
 
-- **Economy**: `START_SUGAR`, `roundBonus()` in `waves.js`; per-layer sugar is 1 by design.
+- **Economy**: `START_SUGAR`, `roundBonus()`, `HONEYPOT_STACK` (each extra Honeypot pays
+  ×0.7 of the previous — farms have diminishing returns) in `waves.js`; per-layer sugar is 1.
 - **Difficulty**: `DIFFICULTY.{easy,medium,hard}` cost/speed/boss-HP multipliers plus
   `easyAdjust` (thinner waves, camo delayed) and `hardAdjust` (+25% bugs, tighter gaps,
   camo from r6 and on every round past r15) wave shaping (`waves.js`).

@@ -121,6 +121,10 @@ export function roundBonus(round) {
 export const START_SUGAR = 300;
 export const START_CRUMBS = 100;
 
+// Each additional Honeypot pays ×0.7 of the one before it (1st 100%, 2nd 70%,
+// 3rd 49%…): one sugar bank is a plan, a farm row is not a win button.
+export const HONEYPOT_STACK = 0.7;
+
 // Sugar Decoy consumable: drop a sugar cube on the grass — ground bugs (not flyers,
 // not bosses) inside `radius` stop and eat until its `bites` run out.
 export const DECOY = {

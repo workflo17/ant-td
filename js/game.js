@@ -1,6 +1,6 @@
 // ===== Game orchestrator: economy, rounds, placement, buffs, win/lose =====
 import { WORLD_W, WORLD_H, PATH_HALF_W } from '../data/maps.js';
-import { WAVES, freeplayRound, freeplayHpMul, roundBonus, easyAdjust, hardAdjust, START_SUGAR, START_CRUMBS, DIFFICULTY, DECOY } from '../data/waves.js';
+import { WAVES, freeplayRound, freeplayHpMul, roundBonus, easyAdjust, hardAdjust, START_SUGAR, START_CRUMBS, DIFFICULTY, DECOY, HONEYPOT_STACK } from '../data/waves.js';
 import { XP_LEVELS, ABILITY_UNLOCK_LEVEL, ABILITY2_UNLOCK_LEVEL } from '../data/heroes.js';
 import { RELICS, ASCEND_COST, ASCEND_GROWTH } from '../data/relics.js';
 import { PERKS } from '../data/perks.js';
@@ -336,10 +336,12 @@ export class Game {
     const bonus = Math.round(roundBonus(this.round) * this.incomeMul) + (this.relicIncome || 0);
     this.sugar += bonus;
     this.stats.earned += bonus;
-    // honeypot income, then interest on the new total
+    // honeypot income (each extra pot pays less — see HONEYPOT_STACK), then interest
+    let potIdx = 0;
     for (const t of this.towers) {
       if (t.stats.income) {
-        const amt = Math.round(t.stats.income * this.incomeMul * this.honeyMul); // Backyard Legend: +10%
+        const stackMul = Math.pow(HONEYPOT_STACK, potIdx++);
+        const amt = Math.round(t.stats.income * stackMul * this.incomeMul * this.honeyMul); // Backyard Legend: +10%
         this.sugar += amt;
         this.stats.earned += amt;
         textPop(t.x, t.y - 24, `+${amt}`, '#ffd166');
@@ -750,10 +752,11 @@ export class Game {
       this.sugar += 200;
       this.stats.earned += 200;
       textPop(this.hero.x, this.hero.y - 30, 'HARVEST! +200', '#ffd166', 18);
-      // every Honeypot pays out its round income right now
+      // every Honeypot pays out its round income right now (same stacking rule)
+      let hpotIdx = 0;
       for (const t of this.towers) {
         if (t.stats.income) {
-          const amt = Math.round(t.stats.income * this.incomeMul);
+          const amt = Math.round(t.stats.income * Math.pow(HONEYPOT_STACK, hpotIdx++) * this.incomeMul);
           this.sugar += amt;
           this.stats.earned += amt;
           textPop(t.x, t.y - 24, `+${amt}`, '#ffd166');
