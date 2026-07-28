@@ -1,8 +1,8 @@
 // ===== Game orchestrator: economy, rounds, placement, buffs, win/lose =====
 import { WORLD_W, WORLD_H, PATH_HALF_W } from '../data/maps.js';
-import { WAVES, freeplayRound, freeplayHpMul, roundBonus, easyAdjust, START_SUGAR, START_CRUMBS, DIFFICULTY, DECOY } from '../data/waves.js';
+import { WAVES, freeplayRound, freeplayHpMul, roundBonus, easyAdjust, hardAdjust, START_SUGAR, START_CRUMBS, DIFFICULTY, DECOY } from '../data/waves.js';
 import { XP_LEVELS, ABILITY_UNLOCK_LEVEL, ABILITY2_UNLOCK_LEVEL } from '../data/heroes.js';
-import { RELICS, ASCEND_COST } from '../data/relics.js';
+import { RELICS, ASCEND_COST, ASCEND_GROWTH } from '../data/relics.js';
 import { PERKS } from '../data/perks.js';
 import { STAR_REWARDS } from '../data/starRewards.js';
 import { TOWER_ORDER } from '../data/towers.js';
@@ -111,7 +111,7 @@ export class Game {
     this.powerCd = { rain: 0, guards: 0 }; // colony powers
     this.guards = [];                       // temporary guard posts
     this.decoys = [];                       // sugar-cube decoys: bugs stop to eat
-    this.ascensionUsed = false;             // one paragon per game
+    this.ascensions = 0;                    // paragons bought; each costs more than the last
     this.relics = {};                       // Foraging Run drafts
     this.starMul = 1;
     // Foraging Run: only a starter kit is unlocked; the rest is drafted
@@ -165,9 +165,10 @@ export class Game {
   startRound() {
     if (this.state !== 'idle' || this.paused) return false;
     this.round++;
-    this.hpMul = freeplayHpMul(this.round);
+    this.hpMul = freeplayHpMul(this.round) * (this.diff.hpMul || 1);
     let groups = this.round <= WAVES.length ? WAVES[this.round - 1] : freeplayRound(this.round);
     if (this.diffKey === 'easy') groups = easyAdjust(groups, this.round);
+    else if (this.diffKey === 'hard') groups = hardAdjust(groups, this.round);
     const events = [];
     for (const gr of groups) {
       for (let i = 0; i < gr.n; i++) {
@@ -220,10 +221,17 @@ export class Game {
       typesPlaced: [...this.typesPlaced],
       soldAny: this.soldAny,
       abilityUses: this.abilityUses,
-      ascensionUsed: this.ascensionUsed,
+      ascensions: this.ascensions,
+      powersCast: this.powersCast,
+      powerCd: { rain: Math.ceil(this.powerCd.rain), guards: Math.ceil(this.powerCd.guards) },
       relics: Object.keys(this.relics),
       unlockedTypes: this.unlockedTypes ? [...this.unlockedTypes] : null,
       decoys: this.decoys.map(d => ({ x: d.x, y: d.y, bites: d.bites })), // paid-for cubes survive resume
+      // banked ambush piles survive resume too (owner stored as tower index)
+      traps: this.traps.filter(tr => !tr.dead).map(tr => ({
+        x: tr.x, y: tr.y, charges: tr.charges, maxCharges: tr.maxCharges,
+        dmg: tr.dmg, r: tr.r, owner: this.towers.findIndex(t => t.id === tr.ownerId),
+      })),
       towers: this.towers.map(t => ({
         hero: !!t.isHero, typeId: t.typeId, x: t.x, y: t.y,
         tiers: { ...t.tiers }, mode: t.mode, spent: t.spent, level: t.level || 1,
@@ -269,9 +277,16 @@ export class Game {
       t.ascended = !!ts.ascended;
       this.towers.push(t);
     }
-    this.ascensionUsed = !!s.ascensionUsed;
+    this.ascensions = s.ascensions != null ? s.ascensions : (s.ascensionUsed ? 1 : 0);
+    this.powersCast = s.powersCast || 0;
+    if (s.powerCd) this.powerCd = { rain: s.powerCd.rain || 0, guards: s.powerCd.guards || 0 };
     this.decoys = (s.decoys || []).map(d => ({
       x: d.x, y: d.y, bites: d.bites, biteT: 0, eaters: 0, phase: Math.random() * 10,
+    }));
+    this.traps = (s.traps || []).map(ts => ({
+      x: ts.x, y: ts.y, charges: ts.charges, maxCharges: ts.maxCharges, dmg: ts.dmg, r: ts.r,
+      ownerId: ts.owner >= 0 && this.towers[ts.owner] ? this.towers[ts.owner].id : -1,
+      phase: Math.random() * 10, dead: false,
     }));
     if (s.unlockedTypes) this.unlockedTypes = new Set(s.unlockedTypes);
     for (const rid of s.relics || []) {
@@ -439,6 +454,22 @@ export class Game {
       else this.enemies[w++] = e;
     }
     this.enemies.length = w;
+
+    // cheap separation: same-trail bugs that overlap fan out sideways, so a
+    // swarm reads as marching files instead of one blob. Spawn order ≈ trail
+    // order, so checking two array neighbours catches the pile-ups for O(n).
+    for (let i = 1; i < this.enemies.length; i++) {
+      const a = this.enemies[i];
+      if (a.flying) continue;
+      for (let k = 1; k <= 2 && i - k >= 0; k++) {
+        const b = this.enemies[i - k];
+        if (b.flying || b.pathIdx !== a.pathIdx) continue;
+        const rr = (a.type.radius + b.type.radius) * 0.7;
+        if (dist2(a.x, a.y, b.x, b.y) >= rr * rr) continue;
+        const dir = a.laneOff >= b.laneOff ? 1 : -1;
+        a.laneOff = Math.max(-14, Math.min(14, a.laneOff + dir * 30 * dt));
+      }
+    }
 
     for (const t of this.towers) TW.updateTower(this, t, dt);
     updateProjectiles(this, dt);
@@ -617,8 +648,10 @@ export class Game {
     this.crumbs = Math.max(0, this.crumbs - val);
     this.stats.leaks += val;
     this.roundLeaks++;
-    this.leakTally[e.type.name] = (this.leakTally[e.type.name] || 0) + 1;
-    this.leakTotals[e.type.name] = (this.leakTotals[e.type.name] || 0) + 1;
+    // name the modifier that beat you — "19× Gnat" hides that they were camo
+    const label = (e.camo ? 'camo ' : '') + e.type.name;
+    this.leakTally[label] = (this.leakTally[label] || 0) + 1;
+    this.leakTotals[label] = (this.leakTotals[label] || 0) + 1;
     const exit = this.paths[e.pathIdx].points;
     const [ex, ey] = exit[exit.length - 1];
     textPop(Math.min(ex, WORLD_W - 40), ey - 20, `-${val}`, '#ff5d4f', 18);
@@ -631,13 +664,13 @@ export class Game {
     }
   }
 
-  // ---- ascension: fuse a maxed tower into its paragon form, once per game ----
+  // ---- ascension: fuse a maxed tower into its paragon form; repeatable, escalating ----
   ascendCost() {
-    return Math.round(ASCEND_COST * this.diff.costMul * (this.ascendMul || 1));
+    return Math.round(ASCEND_COST * Math.pow(ASCEND_GROWTH, this.ascensions) * this.diff.costMul * (this.ascendMul || 1));
   }
 
   canAscend(t) {
-    return !this.ascensionUsed && !t.isHero && !t.ascended && !!t.def.base.attack
+    return !t.isHero && !t.ascended && !!t.def.base.attack
       && (t.tiers.a === 3 || t.tiers.b === 3);
   }
 
@@ -647,7 +680,7 @@ export class Game {
     this.sugar -= c;
     t.spent += c;
     t.ascended = true;
-    this.ascensionUsed = true;
+    this.ascensions++;
     this.recomputeBuffs();
     ring(t.x, t.y, '#ffd166', 10, 420, 0.5);
     ring(t.x, t.y, '#ffffff', 6, 300, 0.4);

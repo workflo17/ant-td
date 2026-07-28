@@ -43,8 +43,9 @@ plus a `window.TD` scripting API (`TD.place`, `TD.up`, `TD.spawn`, `TD.hit`, `TD
   Overkill damage carries down the chain.
 - **Specials** — **Pillbug** (armored: only explosions/crush/shell-piercers hurt it → 2 Weevils),
   **Snail** (10 HP shell → 2 Hoppers), **Stag Beetle** (round-24 armored mid-boss, 320 HP →
-  3 Pillbugs; every 6s it telegraphs — trembling, gold flash — then **charges** at +120%
-  speed for 1.2s; the charge is a generic data field, `charge:{every,dur,mul}`),
+  3 Pillbugs; every 6s it digs in for a **1.5s slowed telegraph** — trembling, gold
+  flash — then **charges** at +120% speed for 1.2s; all generic data,
+  `charge:{every,dur,mul,tele}`),
   **Caterpillar** (200 HP blimp → 4 Snails), **Hornet Queen** (round-40 boss, 700 HP →
   4 Caterpillars; at half health she **rages once**: +35% speed, releases 2 Caterpillars,
   and holds a 1.5s damage-immune gold shield).
@@ -67,13 +68,13 @@ plus a `window.TD` scripting API (`TD.place`, `TD.up`, `TD.spawn`, `TD.hit`, `TD
 |---|---|---|---|
 | Worker Ant | dart shooter | damage + pierce | attack speed / twin shot |
 | Trap-Jaw Ant | 360° crush snap | radius + targets | stun chance |
-| Acid Archer | infinite-range sniper | armor-shred (pops Pillbugs) + shell bonus | raw damage |
+| Acid Archer | long-range sniper | armor-shred (pops Pillbugs) + shell bonus | raw damage |
 | Exploding Ant | AoE lobber (real Colobopsis!) | blast radius | sticky burn DoT (burn pierces armor) |
 | Weaver Ant | silk slow | slow strength / snare | pierce + splash webs |
 | Army Ant Camp | trail traps (Spike Factory) — piles bite **camo and armor** | pile size + damage | production + pile count |
 | Majoress Guard | late-game DPS anchor (Super) | damage + armor-shred at tier 2 | attack speed / twin shot |
 | Honeypot Replete | income | sugar per round | end-round interest |
-| Pheromone Beacon | aura buff + **camo detection** | attack speed / damage aura | aura radius / global detection |
+| Pheromone Beacon | aura buff; **camo detection lives on Path B** | attack speed / damage aura | camo scent / aura radius + range |
 
 ## Structure — data-driven everything
 
@@ -106,7 +107,9 @@ js/debug.js           ?debug panel + TD scripting API
 All balance lives in `data/` — engine code never needs touching:
 
 - **Economy**: `START_SUGAR`, `roundBonus()` in `waves.js`; per-layer sugar is 1 by design.
-- **Difficulty**: `DIFFICULTY.{easy,medium,hard}` cost/speed multipliers (`waves.js`).
+- **Difficulty**: `DIFFICULTY.{easy,medium,hard}` cost/speed/boss-HP multipliers plus
+  `easyAdjust` (thinner waves, camo delayed) and `hardAdjust` (+25% bugs, tighter gaps,
+  camo from r6 and on every round past r15) wave shaping (`waves.js`).
 - **Round pressure**: group `n`/`gap`/`delay` per round in `WAVES`; debut rounds are
   commented (camo r8, pillbug r12, regen r16, wasp r18, snail r22, stag beetle r24,
   caterpillar r30, queen r40; stags return r34 and in overtime r47/r53).
@@ -119,7 +122,9 @@ All balance lives in `data/` — engine code never needs touching:
   guard bosses from permastun.
 - **Leak pain**: `leakValue` = remaining layers (RBE); path geometry in `maps.js`.
 
-Balance notes from the tuning passes:
+Balance notes from the tuning passes (pre-v15 numbers — the v15 pass capped the
+Archer's range, buffed the Exploder, moved camo scent to Beacon Path B, thickened
+Hard-mode waves and made ascension repeatable, so retest before trusting these):
 - A mixed strategy (workers → beacon by r8 → trap-jaw/exploder before r12 pillbugs →
   archer with Shell Piercer → inferno/husk-splitter tiers by r30) beats Easy r40 with
   no Honeypot farming, finishing with ~⅔ of starting crumbs.
@@ -134,8 +139,9 @@ Balance notes from the tuning passes:
   after every round, draft 1 of 3 — unlock a locked ant, take a **relic** (`data/relics.js`:
   colony-wide passives like +10% range, camo sight for everyone, slower bugs), or grab a
   sugar cache. Relics persist through save/resume.
-- **👑 Ascension**: once per game, a tower with a maxed path can ascend (~3500🍬):
-  +100% damage, +25% range, +30% speed, golden aura. The late-game sugar sink.
+- **👑 Ascension**: any tower with a maxed path can ascend: +100% damage, +25% range,
+  +30% speed, golden aura. Repeatable — each ascension costs ×1.6 the last
+  (3500🍬 base, `ASCEND_GROWTH` in `relics.js`) — so late-game sugar always has a sink.
 - **🍯 Colony Perks**: permanent meta-progression bought with **Royal Jelly** (1 per
   achievement, 1/2/3 per bronze/silver/gold map medal): starting sugar/crumbs, pop income,
   faster veteran stars (`data/perks.js`).

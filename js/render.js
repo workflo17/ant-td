@@ -839,8 +839,8 @@ export function drawEnemy(game, e, time) {
   ctx.save();
   ctx.translate(e.x, e.y - (t.flying ? alt * 0.5 : 0));
   if (e.camo) ctx.globalAlpha = 0.88;
-  // charger telegraph: the beetle digs in and trembles just before the burst
-  const chargeTele = t.charge && e.chargingT <= 0 && e.chargeT > t.charge.every - 0.45;
+  // charger telegraph: the beetle digs in and trembles through the warning window
+  const chargeTele = t.charge && e.chargingT <= 0 && e.teleT > 0;
   const charging = t.charge && e.chargingT > 0;
   if (charging) {
     // motion streaks trail behind the burst

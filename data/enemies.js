@@ -6,7 +6,8 @@
 // hpBar     : draws a health bar (shell & boss types)
 // rank      : "Strong" targeting priority (higher = stronger)
 // hint      : counter-play tip shown on the one-time species intro card
-// charge    : { every, dur, mul } — periodic speed burst with a telegraph
+// charge    : { every, dur, mul, tele } — periodic speed burst; tele = seconds of
+//             slowed dig-in telegraph before each burst (default 1.5)
 // introSub  : sub-line under the boss cinematic banner
 
 export const ENEMIES = {
@@ -65,8 +66,8 @@ export const ENEMIES = {
     name: 'Stag Beetle', hp: 320, speed: 24, radius: 31, rank: 6,
     color: '#5a4030', dark: '#241407', children: [['pillbug', 3]],
     boss: true, armored: true, hpBar: true, slowResist: 0.6, stunImmune: true,
-    charge: { every: 6, dur: 1.2, mul: 2.2 },
-    desc: 'Armored 320 HP mid-boss. Every 6s it lowers its antlers and CHARGES.',
+    charge: { every: 6, dur: 1.2, mul: 2.2, tele: 1.5 },
+    desc: 'Armored 320 HP mid-boss. It digs in for a long moment — then CHARGES.',
     hint: 'Explosions, crush & shred only — brace for the charge!',
     introSub: 'It charges every 6 seconds!',
   },

@@ -1,5 +1,5 @@
 // Grubs TD service worker: network-first with cache fallback -> playable offline.
-const CACHE = 'grubs-td-v3';
+const CACHE = 'grubs-td-v4';
 
 self.addEventListener('install', () => self.skipWaiting());
 

@@ -20,3 +20,5 @@ export const RELICS = [
 ];
 
 export const ASCEND_COST = 3500;
+// Ascension repeats: each one costs ASCEND_GROWTH× the last (3500, 5600, 8960, …)
+export const ASCEND_GROWTH = 1.6;

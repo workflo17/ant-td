@@ -100,6 +100,16 @@ export function easyAdjust(groups, round) {
   return out;
 }
 
+// Hard-mode wave thickening (WAVES stays pristine): +25% bugs per group, 15%
+// tighter spawn gaps, the camo debut arrives early (r6), and from r15 on every
+// round carries at least one camo group. Boss HP scales via DIFFICULTY.hpMul.
+export function hardAdjust(groups, round) {
+  const out = groups.map(gr => ({ ...gr, n: Math.ceil(gr.n * 1.25), gap: gr.gap * 0.85 }));
+  if (round >= 6 && round < 8) out[out.length - 1] = { ...out[out.length - 1], camo: true };
+  if (round >= 15 && !out.some(g => g.camo)) out[0] = { ...out[0], camo: true };
+  return out;
+}
+
 export function freeplayHpMul(round) {
   return round <= 40 ? 1 : 1 + (round - 40) * 0.08;
 }
@@ -123,7 +133,7 @@ export const DECOY = {
 };
 
 export const DIFFICULTY = {
-  easy:   { name: 'Easy',   costMul: 0.85, speedMul: 0.92 },
-  medium: { name: 'Medium', costMul: 1.0,  speedMul: 1.0 },
-  hard:   { name: 'Hard',   costMul: 1.1,  speedMul: 1.08 },
+  easy:   { name: 'Easy',   costMul: 0.85, speedMul: 0.92, hpMul: 1 },
+  medium: { name: 'Medium', costMul: 1.0,  speedMul: 1.0,  hpMul: 1 },
+  hard:   { name: 'Hard',   costMul: 1.1,  speedMul: 1.08, hpMul: 1.25 },
 };

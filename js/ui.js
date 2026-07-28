@@ -1404,7 +1404,7 @@ function checkAchievements(won) {
     abilityAddict: game.abilityUses >= 10,
     moundLord: won && (game.map.mounds || []).filter(md =>
       game.towers.some(t => (t.x - md.x) ** 2 + (t.y - md.y) ** 2 <= md.r * md.r)).length >= 2,
-    ascendant: game.ascensionUsed,
+    ascendant: game.ascensions > 0,
     forager: won && game.mods.forage,
     stormcaller: (game.powersCast || 0) >= 15,
     backyardLegend: backyardStars() >= 18, // all map×difficulty wins

@@ -89,7 +89,9 @@ export function effDamage(t) {
   const vet = 1 + 0.05 * stars;            // % bonus rewards heavy hitters
   const vetFlat = stars >= 2 ? 1 : 0;      // flat +1 so low-damage ants feel it too
   const asc = t.ascended ? 2 : 1;
-  return d > 0 ? Math.max(1, Math.round(d * t.buffDmg * vet * asc) + t.buffDmgAdd + vetFlat) : 0;
+  // fractional damage is real: hitEnemy carries leftover damage down the chain,
+  // so a ★ worker's 1.05 pops an extra layer every 20th hit instead of rounding to 0
+  return d > 0 ? Math.max(1, d * t.buffDmg * vet * asc + t.buffDmgAdd + vetFlat) : 0;
 }
 
 // per-tower service record: layers dealt earn veteran stars (+5% damage each)
@@ -223,7 +225,7 @@ function fireBomb(game, t, target) {
   const s = t.stats;
   t.aim = Math.atan2(target.y - t.y, target.x - t.x);
   // lead the target along its path
-  const flight = 0.45;
+  const flight = s.projFlight || 0.45;
   const tPath = game.pathFor(target);
   const lookahead = Math.min(target.dist + target.curSpeed * flight, tPath.length - 1);
   const aimPt = { x: 0, y: 0, angle: 0, seg: 0 };

@@ -59,6 +59,7 @@ export function initEnemy(game, e, typeId, opts) {
   e.shieldT = 0;      // damage-immune window (seconds)
   e.rageSpeed = 1;    // speed multiplier from the queen's rage
   e.chargeT = 0;      // charger types: time since last charge
+  e.teleT = 0;        // remaining dig-in telegraph before a charge
   e.chargingT = 0;    // remaining charge-burst duration
   e.hitT = 0;      // white-flash + squash timer
   e.spawnT = 0.25; // spring-in timer
@@ -71,7 +72,7 @@ function transform(game, e, typeId) {
   e.typeId = typeId;
   e.type = ENEMIES[typeId];
   e.rageSpeed = 1; // a popped queen's brood doesn't inherit her rage
-  e.chargeT = 0; e.chargingT = 0; // a popped charger's children don't inherit the burst
+  e.chargeT = 0; e.teleT = 0; e.chargingT = 0; // a popped charger's children don't inherit the burst
   e.hp = scaledHp(typeId, e.hpMul);
   e.maxHp = e.hp;
   e.jfill = e.type.boss ? null : jitterColor(e.type.color, Math.random() * 14 - 7, Math.random() * 8 - 4);
@@ -240,21 +241,30 @@ export function updateEnemy(game, e, dt) {
   if (e.spawnT > 0) e.spawnT -= dt;
   if (e.shieldT > 0) e.shieldT -= dt;
 
-  // charger types (data-driven: type.charge {every,dur,mul}) — telegraph, then burst
+  // charger types (data-driven: type.charge {every,dur,mul,tele}) — a real
+  // telegraph: the bug digs in SLOW for tele seconds (warning ring + tremble),
+  // and only then bursts. The slow-down is the player's reaction window.
   const ch = e.type.charge;
   let chargeMul = 1;
   if (ch) {
     if (e.chargingT > 0) {
       e.chargingT -= dt;
       chargeMul = ch.mul;
+    } else if (e.teleT > 0) {
+      e.teleT -= dt;
+      chargeMul = 0.35; // braced and digging in
+      if (e.teleT <= 0) {
+        e.chargingT = ch.dur;
+        chargeMul = ch.mul;
+        burst(e.x, e.y, e.type.color, 8, 120);
+        sfx.snap();
+      }
     } else {
       e.chargeT += dt;
       if (e.chargeT >= ch.every) {
         e.chargeT = 0;
-        e.chargingT = ch.dur;
-        chargeMul = ch.mul;
+        e.teleT = ch.tele || 1.5;
         ring(e.x, e.y, '#ffd166', e.type.radius + 4, 200, 0.3);
-        burst(e.x, e.y, e.type.color, 8, 120);
         sfx.snap();
       }
     }

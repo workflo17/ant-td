@@ -47,10 +47,10 @@ export const TOWERS = {
   },
 
   archer: {
-    name: 'Acid Archer', cost: 280, footprint: 15, hotkey: '3',
-    tagline: 'Infinite range, precision acid shots.',
+    name: 'Acid Archer', cost: 340, footprint: 15, hotkey: '3',
+    tagline: 'Long-range precision acid shots.',
     color: '#8e5bc6', dark: '#43246b',
-    base: { attack: 'snipe', damageType: 'acid', range: 9999, cooldown: 1.5, damage: 2 },
+    base: { attack: 'snipe', damageType: 'acid', range: 260, cooldown: 1.5, damage: 2 },
     paths: {
       a: { name: 'Shred', tiers: [
         { name: 'Shell Piercer', cost: 120, desc: 'Shots damage armored Pillbugs', set: { shred: true } },
@@ -66,10 +66,10 @@ export const TOWERS = {
   },
 
   exploder: {
-    name: 'Exploding Ant', cost: 350, footprint: 17, hotkey: '4',
+    name: 'Exploding Ant', cost: 300, footprint: 17, hotkey: '4',
     tagline: 'Real Colobopsis! Lobs blasts that pop armor.',
     color: '#e2762a', dark: '#7a3608',
-    base: { attack: 'bomb', damageType: 'explosion', range: 130, cooldown: 1.6, damage: 1, blast: 40 },
+    base: { attack: 'bomb', damageType: 'explosion', range: 130, cooldown: 1.3, damage: 2, blast: 55, projFlight: 0.34 },
     paths: {
       a: { name: 'Boom', tiers: [
         { name: 'Bigger Boom', cost: 130, desc: '+15 blast radius', add: { blast: 15 } },
@@ -162,9 +162,9 @@ export const TOWERS = {
 
   beacon: {
     name: 'Pheromone Beacon', cost: 200, footprint: 16, hotkey: '9',
-    tagline: 'Scent aura: buffs ants and reveals camo.',
+    tagline: 'Scent aura buffs ants. Upgrades sniff out camo.',
     color: '#e9e4d2', dark: '#5b5442',
-    base: { attack: null, range: 120, auraRate: 1.12, camoDetect: true },
+    base: { attack: null, range: 120, auraRate: 1.12 },
     paths: {
       a: { name: 'Fury', tiers: [
         { name: 'Rally Scent', cost: 110, desc: 'Ants in aura attack 25% faster', set: { auraRate: 1.25 } },
@@ -172,9 +172,9 @@ export const TOWERS = {
         { name: 'War Dance', cost: 620, desc: '+2 damage, +35% speed in aura', set: { auraDmgAdd: 2, auraRate: 1.35 } },
       ]},
       b: { name: 'Scent', tiers: [
-        { name: 'Long Trails', cost: 90, desc: '+45 aura radius', add: { range: 45 } },
-        { name: 'Far Scouts', cost: 220, desc: '+45 more radius, ants get +12% range', add: { range: 45 }, set: { auraRange: 1.12 } },
-        { name: 'Omniscent', cost: 560, desc: 'EVERY ant on the map sees camo', set: { globalDetect: true } },
+        { name: 'Keen Scent', cost: 150, desc: 'Ants in the aura can see camo bugs', set: { camoDetect: true } },
+        { name: 'Far Scouts', cost: 220, desc: '+45 aura radius, ants get +12% range', add: { range: 45 }, set: { auraRange: 1.12 } },
+        { name: 'Omniscent', cost: 560, desc: '+70 more radius, +20% range for ants in aura', add: { range: 70 }, set: { auraRange: 1.2 } },
       ]},
     },
   },
