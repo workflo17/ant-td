@@ -1,7 +1,11 @@
-// ===== Cinematic title scene: procedural key art, drawn live by the game's own hands =====
-// A golden-hour meadow diorama — layered hills with parallax, god rays, an ant parade
-// with long shadows, drifting seeds and pollen, blurred foreground foliage, vignette.
-// Pure Canvas 2D, zero assets. Runs only while the title screen is visible.
+// ===== Cinematic scenes: procedural key art, drawn live by the game's own hands =====
+// Two variants share one renderer:
+//  'title' — the golden-hour meadow diorama: layered hills with parallax, god rays,
+//            an ant parade with long shadows, drifting seeds, blurred foreground, vignette.
+//  'menu'  — the same meadow a step out of focus: hills soften into bokeh, the parade
+//            stands down (distant silhouettes keep marching), and a baked dusk wash
+//            darkens the ground so the decision UI reads on top of it.
+// Pure Canvas 2D, zero assets. A scene runs only while its screen is visible.
 import { TOWERS } from '../data/towers.js';
 import { drawAnt } from './render.js';
 import { TAU, mulberry32 } from './util.js';
@@ -11,8 +15,10 @@ let W = 0, H = 0, DPR = 1;
 let running = false;
 let t0 = 0;
 let reduced = false;
+let variant = 'title'; // 'title' | 'menu'
+let bakedFor = '';     // `${variant}:${W}x${H}` — layers rebake when this changes
 
-// baked layers (rebuilt on resize)
+// baked layers (rebuilt on resize / variant switch)
 let skyCv, hillsCv = [], fgCv, postCv, rayCv;
 // pointer parallax (lerped)
 let px = 0, py = 0, tx = 0, ty = 0;
@@ -29,6 +35,8 @@ function bakeAll() {
   DPR = Math.min(1.5, window.devicePixelRatio || 1);
   cv.width = Math.round(W * DPR);
   cv.height = Math.round(H * DPR);
+  bakedFor = `${variant}:${W}x${H}`;
+  const menu = variant === 'menu';
   const rng = mulberry32(77);
   const horizon = H * 0.58;
 
@@ -62,11 +70,12 @@ function bakeAll() {
   r.fillStyle = rg;
   r.beginPath(); r.moveTo(0, 38); r.lineTo(640, 0); r.lineTo(640, 90); r.lineTo(0, 52); r.closePath(); r.fill();
 
-  // --- three hill bands, back to front ---
+  // --- three hill bands, back to front (menu: progressively out of focus) ---
   hillsCv = [];
   for (let i = 0; i < 3; i++) {
     const hc = document.createElement('canvas'); hc.width = W + 80; hc.height = H;
     const h = hc.getContext('2d');
+    if (menu) h.filter = `blur(${2 + i * 2.5}px)`; // depth of field: the meadow steps back
     const base = horizon + i * H * 0.1;
     h.fillStyle = HILL_COLS[i];
     h.beginPath();
@@ -86,20 +95,22 @@ function bakeAll() {
     rim.addColorStop(0, `rgba(255,236,170,${0.5 - i * 0.13})`);
     rim.addColorStop(1, 'rgba(255,236,170,0)');
     h.fillStyle = rim; h.fillRect(0, 0, hc.width, H);
-    // grass speckle
+    // grass speckle (menu: fewer — blurred specks read as bokeh)
     h.fillStyle = 'rgba(30,60,20,0.18)';
-    for (let k = 0; k < 160 - i * 30; k++) {
+    for (let k = 0; k < (menu ? 90 : 160) - i * 30; k++) {
       const gx = rng() * (W + 80), gy = base + rng() * (H - base);
       h.fillRect(gx, gy, 1.6, 3 + rng() * 3);
     }
     h.globalCompositeOperation = 'source-over';
+    h.filter = 'none';
     hillsCv.push(hc);
   }
 
   // --- blurred foreground foliage (depth of field) ---
   fgCv = document.createElement('canvas'); fgCv.width = W + 120; fgCv.height = H;
   const f = fgCv.getContext('2d');
-  f.filter = 'blur(8px)';
+  f.filter = menu ? 'blur(10px)' : 'blur(8px)';
+  if (menu) f.globalAlpha = 0.75;
   for (let k = 0; k < 7; k++) {
     const bx = (k / 6) * (W + 120) + (rng() - 0.5) * 60;
     const bh = H * (0.09 + rng() * 0.12); // low tufts framing the bottom, not smudge-poles
@@ -124,26 +135,40 @@ function bakeAll() {
   f.beginPath(); f.arc(0, 0, 34, 0, TAU); f.fill();
   f.restore();
   f.filter = 'none';
+  f.globalAlpha = 1;
 
-  // --- post: vignette + grain, baked once ---
+  // --- post: vignette + grain (menu adds the readability dusk wash), baked once ---
   postCv = document.createElement('canvas'); postCv.width = W; postCv.height = H;
   const p = postCv.getContext('2d');
+  if (menu) {
+    // the ground dims toward the fold so cream stickers and ink text pop
+    const gw = p.createLinearGradient(0, H * 0.4, 0, H);
+    gw.addColorStop(0, 'rgba(26,44,22,0)');
+    gw.addColorStop(0.55, 'rgba(26,44,22,0.30)');
+    gw.addColorStop(1, 'rgba(20,34,18,0.52)');
+    p.fillStyle = gw; p.fillRect(0, 0, W, H);
+    // soft column of shade behind the decision stack
+    const cc = p.createRadialGradient(W / 2, H * 0.52, H * 0.16, W / 2, H * 0.52, H * 0.9);
+    cc.addColorStop(0, 'rgba(34,28,18,0.20)');
+    cc.addColorStop(1, 'rgba(34,28,18,0)');
+    p.fillStyle = cc; p.fillRect(0, 0, W, H);
+  }
   const vg = p.createRadialGradient(W / 2, H * 0.42, H * 0.3, W / 2, H * 0.52, H * 0.95);
   vg.addColorStop(0, 'rgba(40,22,30,0)');
-  vg.addColorStop(0.75, 'rgba(40,22,30,0.10)');
-  vg.addColorStop(1, 'rgba(30,16,26,0.42)');
+  vg.addColorStop(0.75, `rgba(40,22,30,${menu ? 0.14 : 0.10})`);
+  vg.addColorStop(1, `rgba(30,16,26,${menu ? 0.5 : 0.42})`);
   p.fillStyle = vg; p.fillRect(0, 0, W, H);
   for (let k = 0; k < 500; k++) {
     p.fillStyle = rng() > 0.5 ? 'rgba(255,255,255,0.03)' : 'rgba(43,26,16,0.035)';
     p.fillRect(rng() * W, rng() * H, 1.4, 1.4);
   }
 
-  // --- ambient particles ---
+  // --- ambient particles (menu: a quieter drift) ---
   seeds = []; pollen = [];
-  for (let k = 0; k < 11; k++) {
+  for (let k = 0; k < (menu ? 6 : 11); k++) {
     seeds.push({ x: rng() * W, y: rng() * H * 0.8, v: 9 + rng() * 8, ph: rng() * 10, s: 0.8 + rng() * 0.5 });
   }
-  for (let k = 0; k < 9; k++) {
+  for (let k = 0; k < (menu ? 7 : 9); k++) {
     pollen.push({ x: rng() * W, y: H * (0.2 + rng() * 0.5), ph: rng() * 10 });
   }
 }
@@ -151,7 +176,9 @@ function bakeAll() {
 function frame(now) {
   if (!running) return;
   requestAnimationFrame(frame);
+  const menu = variant === 'menu';
   const t = (now - t0) / 1000;
+  const par = menu ? 0.6 : 1; // the workbench looks up from the page less
   px += (tx - px) * 0.045;
   py += (ty - py) * 0.045;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -162,12 +189,12 @@ function frame(now) {
   // god rays: slow fan from the sun, breathing
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.translate(W * 0.72 + px * 2, H * 0.24 + py * 2);
+  ctx.translate(W * 0.72 + px * 2 * par, H * 0.24 + py * 2 * par);
   for (let i = 0; i < 4; i++) {
     const a = 0.55 + i * 0.34 + Math.sin(t * 0.21 + i * 1.7) * 0.03;
     ctx.save();
     ctx.rotate(a);
-    ctx.globalAlpha = 0.07 + 0.03 * Math.sin(t * 0.33 + i * 2.1);
+    ctx.globalAlpha = (0.07 + 0.03 * Math.sin(t * 0.33 + i * 2.1)) * (menu ? 0.55 : 1);
     ctx.drawImage(rayCv, 30, -45, Math.max(W, H) * 1.1, 90);
     ctx.restore();
   }
@@ -175,41 +202,45 @@ function frame(now) {
 
   // hills, back to front, with parallax + a slow breath
   const breathe = Math.sin(t * 0.12) * 3;
-  const offs = [px * 4 + breathe * 0.4, px * 9 + breathe * 0.7, px * 15 + breathe];
+  const offs = [px * 4 + breathe * 0.4, px * 9 + breathe * 0.7, px * 15 + breathe].map(o => o * par);
   for (let i = 0; i < 3; i++) {
-    ctx.drawImage(hillsCv[i], -40 - offs[i], py * (i + 1) * 1.2);
+    ctx.drawImage(hillsCv[i], -40 - offs[i], py * (i + 1) * 1.2 * par);
   }
 
   // distant bug silhouettes marching the middle crest — the threat on the horizon
-  const crestY = H * 0.58 + H * 0.1 - 14 + py * 2.4;
-  ctx.fillStyle = 'rgba(38,28,18,0.6)';
-  for (let i = 0; i < 8; i++) {
-    const bx = W - (((t * 13) + i * (W / 7.3)) % (W + 60)) + 30 - offs[1];
+  const crestY = H * 0.58 + H * 0.1 - 14 + py * 2.4 * par;
+  ctx.fillStyle = `rgba(38,28,18,${menu ? 0.45 : 0.6})`;
+  const count = menu ? 6 : 8;
+  const speed = menu ? 8 : 13;
+  for (let i = 0; i < count; i++) {
+    const bx = W - (((t * speed) + i * (W / (count - 0.7))) % (W + 60)) + 30 - offs[1];
     const bb = Math.sin(t * 7 + i * 1.9) * 1.2;
     ctx.beginPath(); ctx.ellipse(bx, crestY + bb + Math.sin((bx / W) * TAU * 1.4) * 6, 5, 2.6, 0, 0, TAU); ctx.fill();
   }
 
-  // the parade: heroes on the front meadow, marching with long golden-hour shadows
+  // the parade: heroes on the front meadow — title only (the menu keeps its stage clear)
   // (row sits below the menu's footer buttons so the cast never collides with the UI)
-  const rowY = H * 0.9;
-  const drift = reduced ? 0 : (t * 10) % (W + 260);
-  for (let i = 0; i < PARADE.length; i++) {
-    const [ty2, sc] = PARADE[i];
-    let ax = ((i * (W + 260) / PARADE.length) + drift) % (W + 260) - 130;
-    const edge = Math.min(1, Math.min(ax + 110, W + 110 - ax) / 130);
-    if (edge <= 0) continue;
-    const bob = Math.sin(t * 3.1 + i * 1.83) * 2.4;
-    const ay = rowY + (i % 2) * 10 + bob * 0.5;
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, edge);
-    // stretched shadow toward camera-left (sun sits high right)
-    ctx.fillStyle = 'rgba(43,26,16,0.28)';
-    ctx.beginPath();
-    ctx.ellipse(ax - 26 * sc * 0.6, ay + 13 * sc * 0.45, 30 * sc * 0.75, 7 * sc * 0.5, -0.1, 0, TAU);
-    ctx.fill();
-    ctx.translate(0, bob);
-    drawAnt(ctx, ty2, TOWERS[ty2], { x: ax + px * 15, y: ay + py * 3, angle: 0, time: t + i * 1.3, bob: i * 2.1, scale: sc });
-    ctx.restore();
+  if (!menu) {
+    const rowY = H * 0.9;
+    const drift = reduced ? 0 : (t * 10) % (W + 260);
+    for (let i = 0; i < PARADE.length; i++) {
+      const [ty2, sc] = PARADE[i];
+      let ax = ((i * (W + 260) / PARADE.length) + drift) % (W + 260) - 130;
+      const edge = Math.min(1, Math.min(ax + 110, W + 110 - ax) / 130);
+      if (edge <= 0) continue;
+      const bob = Math.sin(t * 3.1 + i * 1.83) * 2.4;
+      const ay = rowY + (i % 2) * 10 + bob * 0.5;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, edge);
+      // stretched shadow toward camera-left (sun sits high right)
+      ctx.fillStyle = 'rgba(43,26,16,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(ax - 26 * sc * 0.6, ay + 13 * sc * 0.45, 30 * sc * 0.75, 7 * sc * 0.5, -0.1, 0, TAU);
+      ctx.fill();
+      ctx.translate(0, bob);
+      drawAnt(ctx, ty2, TOWERS[ty2], { x: ax + px * 15, y: ay + py * 3, angle: 0, time: t + i * 1.3, bob: i * 2.1, scale: sc });
+      ctx.restore();
+    }
   }
 
   // seeds drift down-left; pollen twinkles
@@ -217,13 +248,13 @@ function frame(now) {
   ctx.lineWidth = 1.1;
   for (const sd of seeds) {
     if (!reduced) {
-      sd.y += sd.v * 0.016;
+      sd.y += sd.v * 0.016 * (menu ? 0.7 : 1);
       sd.x += Math.sin(t * 1.1 + sd.ph) * 0.5 - 0.12;
       if (sd.y > H + 12) { sd.y = -12; sd.x = Math.random() * W; }
     }
     const rot = Math.sin(t * 1.4 + sd.ph) * 0.5;
     ctx.save();
-    ctx.globalAlpha = 0.8;
+    ctx.globalAlpha = menu ? 0.55 : 0.8;
     for (let k = 0; k < 5; k++) {
       const a = -Math.PI / 2 + rot + (k - 2) * 0.42;
       ctx.beginPath();
@@ -234,13 +265,13 @@ function frame(now) {
     ctx.restore();
   }
   for (const pl of pollen) {
-    const a = 0.18 + 0.22 * Math.max(0, Math.sin(t * 1.6 + pl.ph));
+    const a = (0.18 + 0.22 * Math.max(0, Math.sin(t * 1.6 + pl.ph))) * (menu ? 0.7 : 1);
     ctx.fillStyle = `rgba(255,233,160,${a})`;
     ctx.beginPath(); ctx.arc(pl.x + Math.sin(t * 0.5 + pl.ph) * 8, pl.y + Math.cos(t * 0.4 + pl.ph * 2) * 5, 1.8, 0, TAU); ctx.fill();
   }
 
   // blurred foreground, strongest counter-parallax = depth
-  ctx.drawImage(fgCv, -60 - px * 24, py * -6);
+  ctx.drawImage(fgCv, -60 - px * 24 * par, py * -6 * par);
 
   ctx.drawImage(postCv, 0, 0);
 }
@@ -251,7 +282,7 @@ function onPointer(e) {
 }
 
 function onResize() {
-  if (!cv) return;
+  if (!cv || !cv.clientWidth) return; // a hidden screen measures 0×0 — bake on next start instead
   bakeAll();
   if (reduced) drawStatic();
 }
@@ -262,14 +293,16 @@ function drawStatic() {
   running = false;
 }
 
-export function startTitleScene() {
-  cv = document.getElementById('title-scene');
-  if (!cv) return;
+function start(id, v) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  cv = el;
   ctx = cv.getContext('2d');
+  variant = v;
   reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!skyCv || cv.clientWidth !== W || cv.clientHeight !== H) bakeAll();
-  if (!startTitleScene.wired) {
-    startTitleScene.wired = true;
+  if (bakedFor !== `${v}:${cv.clientWidth}x${cv.clientHeight}`) bakeAll();
+  if (!start.wired) {
+    start.wired = true;
     window.addEventListener('pointermove', onPointer, { passive: true });
     window.addEventListener('resize', onResize);
   }
@@ -278,6 +311,7 @@ export function startTitleScene() {
   if (!running) { running = true; requestAnimationFrame(frame); }
 }
 
-export function stopTitleScene() {
-  running = false;
-}
+export function startTitleScene() { start('title-scene', 'title'); }
+export function stopTitleScene() { running = false; }
+export function startMenuScene() { start('menu-scene', 'menu'); }
+export function stopMenuScene() { running = false; }

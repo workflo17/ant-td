@@ -6,7 +6,7 @@ import { TOWERS, TOWER_ORDER, SELL_RATIO } from '../data/towers.js';
 import { HEROES, HERO_ORDER, XP_LEVELS, ABILITY_UNLOCK_LEVEL } from '../data/heroes.js';
 import { Game } from './game.js';
 import { bakeMap, drawTowerIcon, drawAnt, setShakeEnabled, setReducedFlash } from './render.js';
-import { startTitleScene, stopTitleScene } from './title.js';
+import { startTitleScene, stopTitleScene, startMenuScene, stopMenuScene } from './title.js';
 import { setReducedFx } from './particles.js';
 import { HONEYPOT_STACK } from '../data/waves.js';
 import { MODES, MODE_LABEL, effDamage, isGroundOnly, recomputeStats } from './towers.js';
@@ -245,9 +245,21 @@ function showTitle() {
   hideModal();
   if (els.screenGame) els.screenGame.classList.add('hidden');
   if (els.screenMenu) els.screenMenu.classList.add('hidden');
+  stopMenuScene();
   if (els.screenTitle) els.screenTitle.classList.remove('hidden');
   startTitleScene();
   refreshTitle();
+}
+
+// re-running an entrance: the class only exists for the choreography window, so
+// re-renders mid-stay (map picks, diff picks) never replay the stagger
+let enterTimer = 0;
+function playEntrance(screenEl, ms = 950) {
+  screenEl.classList.remove('enter');
+  void screenEl.offsetWidth; // restart CSS animations even on a quick re-entry
+  screenEl.classList.add('enter');
+  clearTimeout(enterTimer);
+  enterTimer = setTimeout(() => screenEl.classList.remove('enter'), ms);
 }
 
 function showLevels() {
@@ -255,6 +267,8 @@ function showLevels() {
   if (els.screenGame) els.screenGame.classList.add('hidden');
   stopTitleScene();
   els.screenMenu.classList.remove('hidden');
+  startMenuScene();
+  playEntrance(els.screenMenu);
   renderMenu();
 }
 
@@ -601,7 +615,6 @@ function renderTrail() {
     if (!locked) node.addEventListener('click', () => { selMapId = map.id; renderMenu(); });
     els.trail.appendChild(node);
   }
-  els.trailStars.textContent = `${goldTrim ? '👑 ' : ''}⭐ ${totalStars}/${MAPS.length * 3} backyard stars`;
 }
 
 // ---- Star Rewards strip: the track under the trail — earned, never spent ----
@@ -673,6 +686,8 @@ export function renderMenu() {
   els.trail.parentNode.classList.toggle('hidden', mapView !== 'trail');
   els.mapCards.classList.toggle('hidden', mapView === 'trail');
   if (mapView === 'trail') renderTrail();
+  // the star pill belongs to the header, so it fills in BOTH views (renderTrail alone starved the list view)
+  els.trailStars.textContent = `${backyardStars() >= 12 ? '👑 ' : ''}⭐ ${backyardStars()}/${MAPS.length * 3} backyard stars`;
   renderStarRewards();
   // Backyard Legend (⭐18): the logo goes gold
   const logoEl = document.querySelector('.logo');
@@ -1026,8 +1041,10 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
   hideModal();
   if (els.screenTitle) els.screenTitle.classList.add('hidden');
   stopTitleScene();
+  stopMenuScene();
   els.screenMenu.classList.add('hidden');
   els.screenGame.classList.remove('hidden');
+  playEntrance(els.screenGame, 850);
   setSpeed(1);
   game.autoStart = els.chkAuto.checked; // carry the visible toggle into the new game
   dispSugar = null;

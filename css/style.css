@@ -21,6 +21,13 @@
   --amber: #8a5400;
   --wood: #8a5a33;
   --sky: #8fd3e8;
+  /* the foil: one gold gradient shared by every clipped header */
+  --foil: linear-gradient(168deg, #fff3c8 8%, #ffd166 32%, #f5a623 55%, #c97a10 78%, #ffd166 96%);
+  /* procedural paper tooth — two offset speckle grids + a soft sheen, all gradients */
+  --tex-paper:
+    radial-gradient(rgba(43, 26, 16, 0.05) 1px, transparent 1.1px),
+    radial-gradient(rgba(255, 255, 255, 0.6) 1px, transparent 1.15px),
+    linear-gradient(rgba(255, 255, 255, 0.05), rgba(43, 26, 16, 0.04));
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -111,6 +118,9 @@ html, body {
 
 /* ---------- title screen: cinematic key art, drawn live by the game ---------- */
 #title-scene { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+/* the Levels screen looks over the same meadow, a step out of focus; fixed so the
+   decision column scrolls OVER the world (z:-1 keeps every unpositioned child above it) */
+#menu-scene { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; }
 .title-inner { position: relative; z-index: 1; text-align: center; padding: 24px; max-width: 620px; }
 /* soft scrim so type and buttons sit ON the scene, not fight it */
 .title-inner::before {
@@ -121,22 +131,24 @@ html, body {
 
 /* the logo goes foil-gold: gradient fill, ink stroke, extrusion, sheen sweep.
    The clip lives on .logo-g so no TRANSFORMED child sits inside a clipped box —
-   background-clip:text + transformed descendants paints ghost glyphs in Chromium. */
-#screen-title .logo {
+   background-clip:text + transformed descendants paints ghost glyphs in Chromium.
+   The Levels screen wears the same foil at workbench size. */
+#screen-title .logo, #screen-menu .logo {
   text-shadow: none;
   filter: drop-shadow(3px 4px 0 var(--ink)) drop-shadow(0 10px 18px rgba(120, 60, 10, 0.45));
-  animation: logo-drop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
-#screen-title .logo-g {
+#screen-title .logo { animation: logo-drop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+#screen-title .logo-g, #screen-menu .logo-g {
   display: inline-block;
-  background: linear-gradient(168deg, #fff3c8 8%, #ffd166 32%, #f5a623 55%, #c97a10 78%, #ffd166 96%);
+  background: var(--foil);
   background-size: 100% 220%;
   -webkit-background-clip: text; background-clip: text;
   color: transparent;
   -webkit-text-stroke: 2.5px var(--ink);
   animation: logo-sheen 7s ease-in-out 2s infinite;
 }
-#screen-title .logo-td { -webkit-text-stroke: 2.5px var(--ink); }
+#screen-title .logo-td, #screen-menu .logo-td { -webkit-text-stroke: 2.5px var(--ink); }
+#screen-menu .logo-g, #screen-menu .logo-td { -webkit-text-stroke-width: 2px; }
 @keyframes logo-drop {
   from { opacity: 0; transform: translateY(-46px) rotate(-2deg) scale(0.92); }
   to { opacity: 1; transform: translateY(0) rotate(-2deg) scale(1); }
@@ -189,7 +201,11 @@ html, body {
   .title-newhint, .wave-warn, .bug-card, .ach-toast,
   .mc-start, .sr-chip.next,
   #screen-title .logo, #screen-title .logo-g, #screen-title .title-primer,
-  #screen-title #btn-title-play, #screen-title .title-row, #screen-title .title-foot { animation: none; }
+  #screen-title #btn-title-play, #screen-title .title-row, #screen-title .title-foot,
+  #screen-menu .logo, #screen-menu .logo-g,
+  #screen-menu.enter .logo, #screen-menu.enter #trail-wrap, #screen-menu.enter #diff-row,
+  #screen-menu.enter #loadout, #screen-menu.enter #cta-dock, #screen-menu.enter #star-rewards,
+  #screen-menu.enter .menu-foot { animation: none; }
 }
 
 #map-cards {
@@ -206,15 +222,37 @@ html, body {
   text-align: left;
   font-size: 12px;
   position: relative;
+  /* elevated sticker: the brand's hard offset + a real ambient drop underneath */
+  box-shadow: 4px 4px 0 rgba(43, 26, 16, 0.85), 0 14px 26px rgba(18, 30, 12, 0.35);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease;
 }
 .map-card canvas {
   width: 100%;
   border: 2.5px solid var(--ink);
   border-radius: 8px;
   display: block;
+  transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-.map-card.selected { background: #ffe9a8; transform: rotate(-1deg) scale(1.04); }
-.map-card.locked { opacity: 0.8; cursor: not-allowed; background: #d9d2c0; }
+.map-card:hover:not(.locked) {
+  transform: translate(-2px, -4px) rotate(-0.8deg);
+  box-shadow: 6px 8px 0 rgba(43, 26, 16, 0.85), 0 22px 38px rgba(18, 30, 12, 0.42);
+}
+.map-card:hover:not(.locked) canvas { transform: scale(1.03); }
+.map-card:active:not(.locked) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 rgba(43, 26, 16, 0.85), 0 6px 12px rgba(18, 30, 12, 0.3);
+}
+.map-card.selected {
+  background-color: #ffe9a8;
+  transform: rotate(-1deg) scale(1.04);
+  box-shadow: 0 0 0 3px var(--honey), 4px 4px 0 rgba(43, 26, 16, 0.85), 0 16px 30px rgba(18, 30, 12, 0.4);
+}
+.map-card.selected:hover { transform: rotate(-1deg) scale(1.05) translate(-1px, -2px); }
+/* locked maps sit flat on the page — elevation is for cards you can actually pick */
+.map-card.locked {
+  opacity: 0.8; cursor: not-allowed; background-color: #d9d2c0;
+  box-shadow: 3px 3px 0 rgba(43, 26, 16, 0.7), 0 6px 12px rgba(18, 30, 12, 0.22);
+}
 .mc-name { font-size: 15px; font-weight: 900; margin-top: 6px; }
 .mc-tag { font-size: 11px; padding: 1px 7px; border-radius: 8px; border: 2px solid var(--ink); vertical-align: 2px; }
 .mc-tag.gentle { background: #b8e08a; }
@@ -261,12 +299,12 @@ html, body {
 .trail-node:hover:not(:disabled):not(.locked) { transform: translate(-50%, -50%) rotate(-1deg) scale(1.05); }
 .trail-node:active:not(:disabled):not(.locked) { transform: translate(-50%, -50%) scale(0.97); }
 .trail-node.selected {
-  background: #ffe9a8; z-index: 2;
+  background-color: #ffe9a8; z-index: 2;
   transform: translate(-50%, -50%) rotate(-2deg) scale(1.08);
-  box-shadow: 0 0 0 3px var(--honey), 4px 4px 0 rgba(43, 26, 16, 0.85);
+  box-shadow: 0 0 0 3px var(--honey), 4px 4px 0 rgba(43, 26, 16, 0.85), 0 14px 24px rgba(18, 30, 12, 0.38);
 }
 .trail-node.selected:hover { transform: translate(-50%, -50%) rotate(-2deg) scale(1.08); }
-.trail-node.locked { background: #d9d2c0; cursor: not-allowed; opacity: 0.9; }
+.trail-node.locked { background-color: #d9d2c0; cursor: not-allowed; opacity: 0.9; }
 .trail-node.locked:hover { transform: translate(-50%, -50%); }
 .tn-emblem { width: 52px; height: 52px; border-radius: 50%; border: 2.5px solid var(--ink); display: block; }
 .tn-medal { position: absolute; top: -9px; right: -7px; font-size: 18px; filter: drop-shadow(1px 1px 0 rgba(43, 26, 16, 0.6)); }
@@ -307,13 +345,22 @@ html, body {
 .diff-btn { padding: 8px 26px; font-size: 16px; }
 .diff-btn.selected { background: #ffe9a8; transform: rotate(-1.5deg) scale(1.08); }
 
-/* the commitment dock: map + difficulty + go, pinned while the page scrolls */
+/* the commitment dock: map + difficulty + go, pinned while the page scrolls.
+   Its shade is an oversized soft pool (::before overhangs the column and fades to
+   zero before its own edges) — any background on the box itself prints hard seams
+   over the living meadow. #screen-menu clips X so the overhang can't cause h-scroll. */
 #cta-dock {
   position: sticky; bottom: 0; z-index: 5;
   display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap;
   padding: 14px 8px 10px; margin-top: 6px;
-  background: linear-gradient(to top, rgba(72, 128, 52, 0.95) 55%, rgba(72, 128, 52, 0));
 }
+#cta-dock::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  inset: -36px -180px 0;
+  background: radial-gradient(55% 64% at 50% 58%,
+    rgba(28, 48, 22, 0.9) 0%, rgba(28, 48, 22, 0.48) 52%, rgba(28, 48, 22, 0) 78%);
+}
+#screen-menu { overflow-x: hidden; }
 .menu-settings { position: absolute; top: 16px; right: 16px; font-size: 18px; padding: 8px 12px; z-index: 6; }
 
 .big-btn { padding: 14px 34px; font-size: 20px; font-weight: 900; background: var(--honey); }
@@ -322,7 +369,7 @@ html, body {
 .hero-row-title { width: 100%; color: var(--cream); font-weight: 900; font-size: 13px; letter-spacing: 1.5px;
   text-shadow: 1px 1px 0 var(--ink), -1px -1px 0 var(--ink), 1px -1px 0 var(--ink), -1px 1px 0 var(--ink); }
 .hero-card { display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 8px; font-size: 13px; text-align: left; }
-.hero-card.selected { background: #ffe9a8; transform: rotate(-1deg) scale(1.06); }
+.hero-card.selected { background-color: #ffe9a8; transform: rotate(-1deg) scale(1.06); }
 .hero-card canvas { width: 40px; height: 40px; }
 .hc-name { font-weight: 900; }
 .hc-ab { font-size: 11px; color: var(--wood); }
@@ -496,8 +543,8 @@ html, body {
 .mc-tag.soaked { background: #a9dcec; }
 
 .draft-row { display: flex; gap: 12px; justify-content: center; margin-top: 12px; }
-.draft-card { width: 128px; padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; text-align: center; background: #fff9e8; }
-.draft-card:hover { background: #ffe9a8; }
+.draft-card { width: 128px; padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; text-align: center; background-color: #fff9e8; }
+.draft-card:hover { background-color: #ffe9a8; }
 .dc-ico { font-size: 28px; }
 .draft-card small { color: var(--wood); font-weight: 400; }
 
@@ -642,6 +689,74 @@ html, body {
   padding: 10px 12px; margin-top: 14px !important; font-weight: 700;
 }
 
+/* ---------- the big-team finish: foil, paper, choreography ---------- */
+
+/* foil section headers: the logo's gold, scaled down to label size — small type
+   drops the bronze stops (they mud out below ~20px) and thins the stroke.
+   Clipped elements stay leaf nodes — no transformed children (Chromium ghost-glyph trap). */
+.trail-title, .sr-title, .diff-label, .hero-row-title, .shop-title {
+  background: linear-gradient(180deg, #fff1bd 0%, #ffcf5a 52%, #f2a41b 100%);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0.75px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: none;
+  filter: drop-shadow(1.5px 2px 0 rgba(43, 26, 16, 0.82));
+}
+/* gold leaf needs a little size to sparkle — labels step up a notch */
+.trail-title { font-size: 15px; }
+.diff-label { font-size: 15px; }
+.sr-title { font-size: 14px; }
+.hero-row-title { font-size: 14px; }
+
+/* paper tooth on the big sticker surfaces (variants above use background-color,
+   so the texture survives selection/hover states) */
+.map-card, .trail-node, .hero-card, .draft-card, #modal-card, .panel-card,
+.ach-toast, .bug-card, #coach, #coach-camo, #coach-decoy {
+  background-image: var(--tex-paper);
+  background-size: 9px 9px, 13px 13px, 100% 100%;
+  background-position: 0 0, 4px 6px, 0 0;
+}
+
+/* trail nodes sit off the page like the cards do */
+.trail-node { box-shadow: 4px 4px 0 rgba(43, 26, 16, 0.85), 0 10px 20px rgba(18, 30, 12, 0.32); }
+
+/* ---------- Levels & Modes entrance: one choreographed arrival ----------
+   .enter lives on #screen-menu only for the choreography window (JS removes it),
+   so re-renders mid-stay never replay the stagger. Keyframes end at the element's
+   natural pose ('to' omits transform) so selected-card transforms land seamlessly. */
+#screen-menu.enter .logo { animation: logo-drop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+#screen-menu.enter #trail-wrap { animation: title-rise 0.42s cubic-bezier(0.2, 0.7, 0.2, 1.15) 0.05s both; }
+#screen-menu.enter .map-card { animation: card-in 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+/* trail nodes self-center with translate(-50%,-50%): their entrance keeps it */
+#screen-menu.enter .trail-node { animation: node-in 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+#screen-menu.enter .map-card:nth-child(1), #screen-menu.enter .trail-node:nth-child(2) { animation-delay: 0.08s; }
+#screen-menu.enter .map-card:nth-child(2), #screen-menu.enter .trail-node:nth-child(3) { animation-delay: 0.12s; }
+#screen-menu.enter .map-card:nth-child(3), #screen-menu.enter .trail-node:nth-child(4) { animation-delay: 0.16s; }
+#screen-menu.enter .map-card:nth-child(4), #screen-menu.enter .trail-node:nth-child(5) { animation-delay: 0.20s; }
+#screen-menu.enter .map-card:nth-child(5), #screen-menu.enter .trail-node:nth-child(6) { animation-delay: 0.24s; }
+#screen-menu.enter .map-card:nth-child(6), #screen-menu.enter .trail-node:nth-child(7) { animation-delay: 0.28s; }
+#screen-menu.enter #diff-row { animation: title-rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1.15) 0.30s both; }
+#screen-menu.enter #loadout { animation: title-rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1.15) 0.34s both; }
+#screen-menu.enter #cta-dock { animation: dock-rise 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.38s both; }
+#screen-menu.enter #star-rewards { animation: title-rise 0.42s cubic-bezier(0.2, 0.7, 0.2, 1.15) 0.44s both; }
+#screen-menu.enter .menu-foot { animation: title-rise 0.42s cubic-bezier(0.2, 0.7, 0.2, 1.15) 0.48s both; }
+#screen-menu.enter .menu-back, #screen-menu.enter .menu-settings {
+  animation: title-rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1.15) 0.42s both;
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(22px) scale(0.92); }
+  to { opacity: 1; }
+}
+@keyframes node-in {
+  from { opacity: 0; transform: translate(-50%, -50%) translateY(22px) scale(0.92); }
+  to { opacity: 1; }
+}
+@keyframes dock-rise {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; }
+}
+
 /* ---------- debug ---------- */
 
 #debug-panel {
@@ -694,6 +809,7 @@ html, body {
 /* phone portrait: slim wrap-friendly HUD bar, full-width canvas,
    shop as a horizontal scroll strip below */
 @media (max-width: 700px) {
+  #cta-dock::before { inset: -24px -48px 0; } /* narrow screens need less pool spread */
   #screen-game { padding: 6px; gap: 6px; }
   #hud { flex-wrap: wrap; gap: 5px; padding: 6px 8px; width: 100%; }
   .hud-chip { font-size: 13px; padding: 3px 8px; }
