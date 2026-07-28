@@ -93,9 +93,11 @@ const MOD_DEFS = [
 ];
 let lastEndModal = null;
 
-// run score + grade; records the per-map:difficulty best as a side effect
-function scoreLine() {
-  if (!game) return '';
+// run score + grade; records the per-map:difficulty best as a side effect.
+// Called ONCE per run end — the result is captured so re-opening the end modal
+// (via Colony Report → Back) keeps its NEW BEST! flag instead of re-judging.
+function scoreParts() {
+  if (!game) return null;
   const score = game.runScore();
   const grade = SCORE_GRADES.find(([at]) => score >= at)[1];
   const s = loadSave();
@@ -104,7 +106,18 @@ function scoreLine() {
   const prev = s.bestScore[k] || 0;
   const isBest = score > prev;
   if (isBest) { s.bestScore[k] = score; persist(); }
-  return `🏆 Score ${fmt(score)} · grade ${grade}${isBest ? ' · NEW BEST!' : ` · best ${fmt(prev)}`}`;
+  return { score, grade, isBest, prev };
+}
+
+// the end-of-run score as one choreographed row: grade stamps in, score rides beside it
+function scoreRowHtml(sp) {
+  if (!sp) return '';
+  return `<div class="score-row">
+    <span class="grade-stamp" aria-label="grade ${sp.grade}">${sp.grade}</span>
+    <span class="score-text">🏆 Score <b>${fmt(sp.score)}</b>${sp.isBest
+      ? ' <span class="new-best">NEW BEST!</span>'
+      : ` <small>· best ${fmt(sp.prev)}</small>`}</span>
+  </div>`;
 }
 const els = {};
 let shopCards = [];   // { el, typeId }
@@ -1004,32 +1017,34 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
       checkRivalOutcome(); // daily runs: settle the rivalry
       const wonMedal = medalForMap(mapDef.id);
       const medalStr = wonMedal === 'gold' ? '🥇 GOLD' : wonMedal === 'silver' ? '🥈 SILVER' : '🥉 BRONZE';
+      const sp = scoreParts(); // judged once — the reopened modal keeps its verdict
       lastEndModal = () => showModal(`
-        <div class="modal-title win">STASH DEFENDED!</div>
+        <div class="modal-title win"><span class="foil-t">STASH DEFENDED!</span></div>
         <p>The Hornet Queen is popped. 40 rounds survived on ${mapDef.name} (${DIFF_LABEL[diffKey]}).</p>
         <p class="modal-stats">${medalStr} medal · 🎈 ${fmt(game.stats.pops)} layers popped · 🍞 ${game.crumbs} crumbs left</p>
-        <p class="modal-stats">${scoreLine()}</p>`,
+        ${scoreRowHtml(sp)}`,
         [
           ['Keep going — freeplay!', () => { game.continueFreeplay(); hideModal(); }],
           ['📊 Colony report', showStats],
           ['Back to menu', toMenu],
-        ]);
+        ], { variant: 'win' });
       lastEndModal();
     },
     onLose() {
       clearRun();
       checkRivalOutcome(); // daily runs: settle the rivalry
+      const sp = scoreParts(); // judged once — the reopened modal keeps its verdict
       lastEndModal = () => showModal(`
         <div class="modal-title lose">THE SUGAR IS GONE</div>
         <p>The bugs broke through on round ${game.round} of ${mapDef.name}.</p>
         <p class="modal-stats">🎈 ${fmt(game.stats.pops)} layers popped before the fall</p>
-        <p class="modal-stats">${scoreLine()}</p>
+        ${scoreRowHtml(sp)}
         ${leakBreakdown(game.leakTotals) ? `<p class="modal-stats">🕳️ Leaked: ${leakBreakdown(game.leakTotals)}</p>` : ''}`,
         [
           ['Try again', () => startGame(mapDef, diffKey)],
           ['📊 Colony report', showStats],
           ['Back to menu', toMenu],
-        ]);
+        ], { variant: 'lose' });
       lastEndModal();
     },
   }, heroDef, mods);
@@ -2002,11 +2017,79 @@ function buildWavePreview() {
 
 let modalPrevFocus = null;
 
-function showModal(html, buttons = []) {
+const motionReduced = () =>
+  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// one-shot golden burst for the victory card — pure DOM + WAAPI, palette colors only
+function burstConfetti(holder) {
+  if (motionReduced()) return;
+  const COLS = ['#f5a623', '#ffd166', '#fff3d6', '#e2472f', '#8fd3e8', '#63a832'];
+  for (let i = 0; i < 44; i++) {
+    const el = document.createElement('i');
+    el.className = 'confetti';
+    const sz = 6 + Math.random() * 7;
+    el.style.width = sz + 'px';
+    el.style.height = sz * (Math.random() < 0.4 ? 1 : 0.55) + 'px';
+    el.style.background = COLS[i % COLS.length];
+    el.style.left = '50%';
+    el.style.top = '36%';
+    if (Math.random() < 0.25) el.style.borderRadius = '50%';
+    holder.appendChild(el);
+    // launch out and up, then gravity wins: flutter down and fade
+    const ang = Math.random() * Math.PI * 2;
+    const d = 80 + Math.random() * 260;
+    const dx = Math.cos(ang) * d * 1.25;
+    const dy = Math.sin(ang) * d * 0.75 - 130;
+    const fall = 260 + Math.random() * 180;
+    const rot = (Math.random() - 0.5) * 900;
+    const dur = 1500 + Math.random() * 900;
+    el.animate([
+      { transform: 'translate(-50%,-50%) rotate(0deg)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${rot * 0.4}deg)`, opacity: 1, offset: 0.32 },
+      { transform: `translate(calc(-50% + ${dx * 1.15}px), calc(-50% + ${dy + fall}px)) rotate(${rot}deg)`, opacity: 0 },
+    ], { duration: dur, easing: 'cubic-bezier(0.15, 0.6, 0.4, 1)', fill: 'forwards' });
+    setTimeout(() => el.remove(), dur + 80);
+  }
+}
+
+// slow embers for the defeat card — loop while the modal is up, removed with it
+function driftEmbers(holder) {
+  if (motionReduced()) return;
+  for (let i = 0; i < 15; i++) {
+    const el = document.createElement('i');
+    el.className = 'ember';
+    el.style.left = (6 + Math.random() * 88) + '%';
+    el.style.bottom = '-14px';
+    const sz = 2.5 + Math.random() * 3.5;
+    el.style.width = el.style.height = sz + 'px';
+    holder.appendChild(el);
+    const rise = 240 + Math.random() * 260;
+    const sway = (Math.random() - 0.5) * 90;
+    el.animate([
+      { transform: 'translate(0,0)', opacity: 0 },
+      { opacity: 0.85, offset: 0.12 },
+      { transform: `translate(${sway * 0.6}px, ${-rise * 0.55}px)`, opacity: 0.7, offset: 0.55 },
+      { transform: `translate(${sway}px, ${-rise}px)`, opacity: 0 },
+    ], { duration: 2800 + Math.random() * 2200, delay: Math.random() * 1600, iterations: Infinity, easing: 'linear' });
+  }
+}
+
+function showModal(html, buttons = [], opts = {}) {
   const modal = els.modal;
   const card = document.getElementById('modal-card');
   card.setAttribute('role', 'dialog');
   card.setAttribute('aria-modal', 'true');
+  // fx layer sits between backdrop and card: confetti/embers never block clicks
+  let fx = document.getElementById('modal-fx');
+  if (!fx) {
+    fx = document.createElement('div');
+    fx.id = 'modal-fx';
+    fx.setAttribute('aria-hidden', 'true');
+    modal.insertBefore(fx, card);
+  }
+  fx.innerHTML = '';
+  modal.classList.toggle('win', opts.variant === 'win');
+  modal.classList.toggle('lose', opts.variant === 'lose');
   card.innerHTML = html;
   const row = document.createElement('div');
   row.className = 'modal-btns';
@@ -2019,6 +2102,8 @@ function showModal(html, buttons = []) {
   }
   card.appendChild(row);
   modal.classList.remove('hidden');
+  if (opts.variant === 'win') burstConfetti(fx);
+  else if (opts.variant === 'lose') driftEmbers(fx);
   modalPrevFocus = document.activeElement;
   const first = row.querySelector('button');
   if (first) first.focus();
@@ -2026,6 +2111,9 @@ function showModal(html, buttons = []) {
 
 function hideModal() {
   els.modal.classList.add('hidden');
+  els.modal.classList.remove('win', 'lose');
+  const fx = document.getElementById('modal-fx');
+  if (fx) fx.innerHTML = '';
   if (modalPrevFocus && modalPrevFocus.focus) modalPrevFocus.focus();
   modalPrevFocus = null;
 }
