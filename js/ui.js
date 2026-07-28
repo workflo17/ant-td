@@ -124,6 +124,161 @@ const els = {};
 let shopCards = [];   // { el, typeId }
 let panelDyn = [];    // dynamic-affordability upgrade buttons: { el, calc() }
 
+// ---- sharing: every result is a recruitment poster ----
+const SHARE_URL = 'https://workflo17.github.io/ant-td/';
+
+// spoiler-free daily brag, Wordle-grammar: date, round, rival verdict, streak, link
+function dailyShareText() {
+  const s = loadSave();
+  const date = dailyDateStr();
+  const best = s.dailyBest[date] || 0;
+  const rv = (s.dailyRivalDef && s.dailyRivalDef.date === date) ? s.dailyRivalDef.rival : null;
+  const beaten = !!(s.dailyRival[date] && s.dailyRival[date].beaten);
+  let txt = `🐜 Grubs TD Daily ${date}\n🌊 reached round ${best}`;
+  if (rv) {
+    txt += beaten
+      ? `\n🏆 crushed ${rv.emoji} ${rv.name} (r${rv.score})`
+      : `\n😤 ${rv.emoji} ${rv.name} still leads (r${rv.score})`;
+  }
+  if (s.dailyStreak > 0) txt += `\n🔥 ${s.dailyStreak}-day streak`;
+  return txt + `\n${SHARE_URL}`;
+}
+
+async function shareDaily() {
+  const txt = dailyShareText();
+  if (navigator.share) {
+    try { await navigator.share({ text: txt }); return; } catch { /* user closed the sheet — fall through */ }
+  }
+  try {
+    await navigator.clipboard.writeText(txt);
+    toast('📣 Copied', 'Daily result is on the clipboard — paste it anywhere.');
+  } catch {
+    toast('📣 Share', txt.split('\n').slice(0, 2).join(' · '));
+  }
+}
+
+// a procedural postcard of the run: mini meadow, map emblem, grade stamp, score
+function buildPostcard(sp) {
+  if (!game) return null;
+  const W2 = 840, H2 = 440;
+  const cv = document.createElement('canvas');
+  cv.width = W2; cv.height = H2;
+  const c = cv.getContext('2d');
+  const won = game.state === 'won' || game.freeplay;
+  // sky
+  const sky = c.createLinearGradient(0, 0, 0, H2);
+  if (won) { sky.addColorStop(0, '#ffd98f'); sky.addColorStop(0.55, '#ffe9b8'); sky.addColorStop(1, '#cfe0a5'); }
+  else { sky.addColorStop(0, '#3a2f55'); sky.addColorStop(0.6, '#6b4a63'); sky.addColorStop(1, '#8a5a4a'); }
+  c.fillStyle = sky; c.fillRect(0, 0, W2, H2);
+  const sun = c.createRadialGradient(W2 * 0.78, H2 * 0.3, 8, W2 * 0.78, H2 * 0.3, H2 * 0.6);
+  sun.addColorStop(0, won ? 'rgba(255,244,210,0.95)' : 'rgba(255,170,90,0.5)');
+  sun.addColorStop(1, 'rgba(255,222,150,0)');
+  c.fillStyle = sun; c.fillRect(0, 0, W2, H2);
+  // hills
+  for (const [col, base, amp] of [[won ? '#8fbc68' : '#4a5a44', 0.66, 26], [won ? '#4e8a38' : '#31402c', 0.78, 34]]) {
+    c.fillStyle = col;
+    c.beginPath();
+    c.moveTo(0, H2);
+    c.lineTo(0, H2 * base);
+    for (let x = 0; x <= W2; x += 40) c.lineTo(x, H2 * base - Math.sin(x / 130 + base * 9) * amp);
+    c.lineTo(W2, H2);
+    c.closePath(); c.fill();
+  }
+  // wordmark
+  c.save();
+  c.translate(W2 / 2, 84);
+  c.rotate(-0.03);
+  c.textAlign = 'center';
+  c.font = "900 64px 'Baloo 2', 'Trebuchet MS', sans-serif";
+  c.lineWidth = 9; c.strokeStyle = '#2b1a10'; c.lineJoin = 'round';
+  c.strokeText('GRUBS TD', 0, 0);
+  const foil = c.createLinearGradient(0, -50, 0, 16);
+  foil.addColorStop(0, '#fff3c8'); foil.addColorStop(0.5, '#ffd166'); foil.addColorStop(1, '#c97a10');
+  c.fillStyle = foil;
+  c.fillText('GRUBS TD', 0, 0);
+  c.restore();
+  // map emblem (round, ink ring)
+  const em = document.createElement('canvas');
+  em.width = em.height = 150;
+  drawTrailEmblem(em, game.map, false);
+  c.save();
+  c.beginPath(); c.arc(160, 250, 79, 0, Math.PI * 2);
+  c.fillStyle = '#2b1a10'; c.fill();
+  c.drawImage(em, 85, 175);
+  c.restore();
+  // result block
+  c.textAlign = 'left';
+  c.fillStyle = '#fff8e6';
+  c.strokeStyle = '#2b1a10'; c.lineJoin = 'round';
+  c.font = "900 40px 'Baloo 2', sans-serif";
+  c.lineWidth = 6;
+  const headline = won ? 'STASH DEFENDED!' : `FELL ON ROUND ${game.round}`;
+  c.strokeText(headline, 270, 218);
+  c.fillText(headline, 270, 218);
+  c.font = "700 24px 'Baloo 2', sans-serif";
+  c.lineWidth = 5;
+  const sub = `${game.map.name} · ${DIFF_LABEL[game.diffKey]}${game.mods.daily ? ' · Daily' : ''}`;
+  c.strokeText(sub, 272, 258);
+  c.fillText(sub, 272, 258);
+  c.font = "700 20px 'Baloo 2', sans-serif";
+  c.lineWidth = 4.5;
+  const stat = `🏆 ${fmt(sp ? sp.score : game.runScore())} · 🎈 ${fmt(game.stats.pops)} layers · 🍞 ${game.crumbs} crumbs`;
+  c.strokeText(stat, 272, 294);
+  c.fillText(stat, 272, 294);
+  // grade stamp
+  const grade = sp ? sp.grade : SCORE_GRADES.find(([at]) => (game.runScore()) >= at)[1];
+  c.save();
+  c.translate(W2 - 120, 258);
+  c.rotate(-0.12);
+  c.fillStyle = '#ffe9a8';
+  c.strokeStyle = '#2b1a10'; c.lineWidth = 6;
+  c.beginPath();
+  if (c.roundRect) c.roundRect(-56, -56, 112, 112, 18);
+  else c.rect(-56, -56, 112, 112); // pre-roundRect Safari: square corners beat a crash
+  c.fill(); c.stroke();
+  c.fillStyle = '#8a5400';
+  c.textAlign = 'center';
+  c.font = "900 64px 'Baloo 2', sans-serif";
+  c.fillText(grade, 0, 24);
+  c.restore();
+  // footer
+  c.textAlign = 'center';
+  c.font = "700 19px 'Baloo 2', sans-serif";
+  c.fillStyle = 'rgba(255, 248, 230, 0.95)';
+  c.lineWidth = 4; c.strokeStyle = 'rgba(43, 26, 16, 0.85)';
+  const foot = `${dailyDateStr()} · play free: ${SHARE_URL.replace('https://', '')}`;
+  c.strokeText(foot, W2 / 2, H2 - 26);
+  c.fillText(foot, W2 / 2, H2 - 26);
+  // sticker frame
+  c.strokeStyle = '#2b1a10'; c.lineWidth = 10;
+  c.strokeRect(5, 5, W2 - 10, H2 - 10);
+  return cv;
+}
+
+// debug/QA hook: the postcard as a data URL (TD.postcard() in debug.js)
+export function postcardDataURL() {
+  const cv = buildPostcard(null);
+  return cv ? cv.toDataURL('image/png') : null;
+}
+
+function sharePostcard(sp) {
+  const cv = buildPostcard(sp);
+  if (!cv) return;
+  cv.toBlob(async (blob) => {
+    if (!blob) return;
+    const file = new File([blob], 'grubs-td-postcard.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: 'Grubs TD', text: SHARE_URL }); return; } catch { /* fall through to download */ }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'grubs-td-postcard.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast('📸 Postcard saved', 'Every screenshot is a recruitment poster.');
+  });
+}
+
 export function getGame() { return game; }
 
 export function setSpeed(n) {
@@ -470,6 +625,7 @@ function showDaily() {
     <p class="rival-note">A local rivalry — your rival colony is spun from today's seed, right here on this device.</p>`,
     [
       ['🐜 Start Daily', () => irisTo(() => { hideModal(); startGame(dl.map, 'medium', null, false, dl); })],
+      ...(best > 0 ? [['📣 Share result', shareDaily]] : []),
       ['Close', hideModal],
     ]);
 }
@@ -1233,6 +1389,8 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
         ${scoreRowHtml(sp)}`,
         [
           ['Keep going — freeplay!', () => { game.continueFreeplay(); hideModal(); }],
+          ['📸 Postcard', () => sharePostcard(sp)],
+          ...(game.mods.daily ? [['📣 Share daily', shareDaily]] : []),
           ['📊 Colony report', showStats],
           ['Back to menu', toMenu],
         ], { variant: 'win' });
@@ -1250,6 +1408,7 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
         ${leakBreakdown(game.leakTotals) ? `<p class="modal-stats">🕳️ Leaked: ${leakBreakdown(game.leakTotals)}</p>` : ''}`,
         [
           ['Try again', () => irisTo(() => startGame(mapDef, diffKey))],
+          ...(game.mods.daily ? [['📣 Share daily', shareDaily]] : []),
           ['📊 Colony report', showStats],
           ['Back to menu', toMenu],
         ], { variant: 'lose' });
@@ -2313,6 +2472,41 @@ function driftEmbers(holder) {
   }
 }
 
+// the victory lap: the title's cast marches home with the spoils, behind the card
+let paradeRaf = 0;
+
+function startWinParade(holder) {
+  if (motionReduced()) return;
+  const cv = document.createElement('canvas');
+  cv.className = 'win-parade';
+  holder.appendChild(cv);
+  const c = cv.getContext('2d');
+  const t0 = performance.now();
+  const CAST = [['worker', 1.5], ['trapjaw', 1.7], ['weaver', 1.5], ['majoress', 2.0], ['honeypot', 1.75]];
+  const loop = () => {
+    if (!cv.isConnected) return;
+    const W2 = cv.clientWidth, H2 = cv.clientHeight;
+    if (!W2) { paradeRaf = requestAnimationFrame(loop); return; }
+    if (cv.width !== W2) { cv.width = W2; cv.height = H2; }
+    const t = (performance.now() - t0) / 1000;
+    c.clearRect(0, 0, W2, H2);
+    const span = W2 + 260;
+    for (let i = 0; i < CAST.length; i++) {
+      const [ty, sc] = CAST[i];
+      const ax = ((i * span / CAST.length) + t * 46) % span - 130;
+      const bob = Math.sin(t * 3.1 + i * 1.8) * 2;
+      const ay = H2 * 0.62 + (i % 2) * 8 + bob * 0.5;
+      c.fillStyle = 'rgba(43, 26, 16, 0.3)';
+      c.beginPath();
+      c.ellipse(ax - 20 * sc * 0.6, ay + 12 * sc * 0.45, 26 * sc * 0.7, 6 * sc * 0.5, -0.1, 0, Math.PI * 2);
+      c.fill();
+      drawAnt(c, ty, TOWERS[ty], { x: ax, y: ay + bob, angle: 0, time: t + i * 1.3, bob: i * 2.1, scale: sc });
+    }
+    paradeRaf = requestAnimationFrame(loop);
+  };
+  paradeRaf = requestAnimationFrame(loop);
+}
+
 function showModal(html, buttons = [], opts = {}) {
   const modal = els.modal;
   const card = document.getElementById('modal-card');
@@ -2341,7 +2535,8 @@ function showModal(html, buttons = [], opts = {}) {
   }
   card.appendChild(row);
   modal.classList.remove('hidden');
-  if (opts.variant === 'win') burstConfetti(fx);
+  cancelAnimationFrame(paradeRaf);
+  if (opts.variant === 'win') { burstConfetti(fx); startWinParade(fx); }
   else if (opts.variant === 'lose') driftEmbers(fx);
   modalPrevFocus = document.activeElement;
   const first = row.querySelector('button');
@@ -2351,6 +2546,7 @@ function showModal(html, buttons = [], opts = {}) {
 function hideModal() {
   els.modal.classList.add('hidden');
   els.modal.classList.remove('win', 'lose');
+  cancelAnimationFrame(paradeRaf);
   const fx = document.getElementById('modal-fx');
   if (fx) fx.innerHTML = '';
   if (modalPrevFocus && modalPrevFocus.focus) modalPrevFocus.focus();

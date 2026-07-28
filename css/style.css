@@ -838,6 +838,8 @@ html, body {
   to { opacity: 1; }
 }
 #modal-fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+/* the victory lap marches the bottom of the screen, behind the card */
+.win-parade { position: absolute; left: 0; right: 0; bottom: 0; height: 140px; }
 .confetti { position: absolute; border: 1.5px solid rgba(43, 26, 16, 0.5); }
 .ember {
   position: absolute; border-radius: 50%;

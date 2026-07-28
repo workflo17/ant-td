@@ -4,7 +4,7 @@ import { unlockAll } from './save.js';
 import { hitEnemy } from './enemies.js';
 import { acquireTarget } from './towers.js';
 import { draw } from './render.js';
-import { uiState } from './ui.js';
+import { uiState, postcardDataURL } from './ui.js';
 import { musicState } from './music.js';
 import { soundState, unlockAudio } from './sound.js';
 
@@ -55,6 +55,7 @@ export function initDebug(api) {
       const ms = (performance.now() - t0) / frames;
       return { msPerFrame: +ms.toFixed(2), fpsCapable: +(1000 / ms).toFixed(0), enemies: g.enemies.length, towers: g.towers.length };
     },
+    postcard() { return postcardDataURL(); },
     shot(name = 'shot') {
       return fetch('http://127.0.0.1:5411/' + name, {
         method: 'POST',
