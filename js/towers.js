@@ -98,6 +98,8 @@ export function effDamage(t) {
 const STAR_AT = [100, 400, 1200];
 export function creditTower(game, t, dealt) {
   if (!dealt || !t) return;
+  // support feels like it did something: buffed kills flicker the scent-blue aura
+  if (t.buffDmgAdd > 0 && dealt >= 1 && Math.random() < 0.12) ring(t.x, t.y, '#63c8f0', 8, 70, 0.25);
   t.dealt = (t.dealt || 0) + dealt * (game.starMul || 1);
   let s = 0;
   while (s < 3 && t.dealt >= STAR_AT[s]) s++;
@@ -110,7 +112,13 @@ export function creditTower(game, t, dealt) {
 }
 
 export function canSee(game, t, e) {
-  return !e.camo || game.globalDetect || game.shroudT > 0 || t.buffDetect || !!t.stats.camoDetect;
+  if (!e.camo || game.globalDetect || game.shroudT > 0 || t.buffDetect || t.stats.camoDetect) return true;
+  // garden twist: while the pond mists at round start, ants near the water see everything
+  if (game.mistT > 0 && game.mistPond) {
+    const p = game.mistPond, r = game.map.twist.r;
+    if (dist2(t.x, t.y, p.x, p.y) < r * r) return true;
+  }
+  return false;
 }
 
 export function srcName(t) {
@@ -128,7 +136,7 @@ function useful(t, e) {
   const s = t.stats;
   if (e.type.flying && GROUND_ONLY_ATTACKS.has(s.attack)) return false; // ground-only
   if (effDamage(t) === 0) return true; // pure support (silk) is always applicable
-  if (e.type.armored && s.damageType !== 'explosion' && s.damageType !== 'crush' && !s.shred) return false;
+  if (e.armored && s.damageType !== 'explosion' && s.damageType !== 'crush' && !s.shred) return false;
   return true;
 }
 
@@ -253,6 +261,7 @@ function fireBomb(game, t, target) {
     srcName: srcName(t), srcT: t,
     dmg: effDamage(t), dtype: 'explosion',
     blast: s.blast, burnDps: s.burnDps || 0, burnDur: s.burnDur || 0,
+    burnGround: s.burnGround || 0,
   });
   sfx.lob();
 }

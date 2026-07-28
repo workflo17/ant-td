@@ -81,12 +81,14 @@ let coinsInFlight = 0;
 let lastCoinT = 0;
 let selHero = 'formica';
 let loadoutOpen = false; // menu declutter: hero + challenges live in a collapsed section
-const selMods = { steel: false, camo: false, speed: false, poverty: false };
+const selMods = { steel: false, camo: false, speed: false, poverty: false, brood: false, closing: false };
 const MOD_DEFS = [
   { id: 'steel', icon: '💀', name: 'Crumbs of Steel', desc: 'Start with a single crumb. One leak = over.' },
-  { id: 'camo', icon: '🕶️', name: 'Camo Chaos', desc: 'Every bug is camouflaged.' },
+  { id: 'camo', icon: '🕶️', name: 'Camo Chaos', desc: 'Every bug is camouflaged — but Beacons cost half.' },
   { id: 'speed', icon: '⚡', name: 'Speed Demon', desc: 'All bugs move 40% faster.' },
   { id: 'poverty', icon: '💸', name: 'Poverty Colony', desc: 'All sugar income halved.' },
+  { id: 'brood', icon: '🐛', name: 'Broodmother', desc: 'Every chain bug spawns one layer deeper.' },
+  { id: 'closing', icon: '⏰', name: 'Closing Time', desc: 'Bugs sprint +60% on the final third of the trail.' },
 ];
 let lastEndModal = null;
 const els = {};
@@ -900,6 +902,7 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
       : { ...selMods, forage, perks: { ...(save.perks || {}) }, stars: backyardStars() };
   game = new Game(mapDef, diffKey, {
     onChange() { renderPanel(); refreshShop(); if (game && game.state === 'idle') saveRun(); },
+    onRebake() { if (game) bakeMap(game); }, // NIGHT FALLS / Nocturne re-light the world mid-run
     onRoundEnd(round) {
       recordBest(mapDef.id, diffKey, round);
       if (game.mods.daily) { // daily run: local per-date best
@@ -1817,7 +1820,7 @@ function wireKeys() {
 
 // chips + boss flag for one round's wave (preview must match what spawns)
 function wavePreviewRound(n) {
-  let groups = n <= WAVES.length ? WAVES[n - 1] : freeplayRound(n);
+  let groups = n <= WAVES.length ? WAVES[n - 1] : freeplayRound(n, game.freeplaySeed || 0);
   if (game.diffKey === 'easy') groups = easyAdjust(groups, n);
   else if (game.diffKey === 'hard') groups = hardAdjust(groups, n); // preview must match what spawns
   return aggregateWave(groups);

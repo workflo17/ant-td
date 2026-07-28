@@ -31,12 +31,12 @@ export const TOWERS = {
     name: 'Trap-Jaw Ant', cost: 140, footprint: 16, hotkey: '2',
     tagline: '360° crushing snap. Cracks armor.',
     color: '#b5442c', dark: '#5e1d0e',
-    base: { attack: 'snap', damageType: 'crush', range: 68, cooldown: 1.1, damage: 1, maxTargets: 6 },
+    base: { attack: 'snap', damageType: 'crush', range: 68, cooldown: 1.0, damage: 1, maxTargets: 6 },
     paths: {
       a: { name: 'Reach', tiers: [
         { name: 'Wide Jaws', cost: 60, desc: '+18 snap radius', add: { range: 18 } },
         { name: 'Whiplash Reach', cost: 150, desc: '+26 radius, hits 4 more bugs', add: { range: 26, maxTargets: 4 } },
-        { name: 'Snap Storm', cost: 420, desc: '+40 radius, +6 targets, +1 damage', add: { range: 40, maxTargets: 6, damage: 1 } },
+        { name: 'Snap Storm', cost: 420, desc: '+40 radius, +6 targets, +2 damage', add: { range: 40, maxTargets: 6, damage: 2 } },
       ]},
       b: { name: 'Venom', tiers: [
         { name: 'Numbing Bite', cost: 75, desc: '15% chance to stun 0.4s', set: { stunChance: 0.15, stunDur: 0.4 } },
@@ -78,8 +78,8 @@ export const TOWERS = {
       ]},
       b: { name: 'Gel', tiers: [
         { name: 'Sticky Burn', cost: 140, desc: 'Burns 2/s for 3s', set: { burnDps: 2, burnDur: 3 } },
-        { name: 'Napalm Sap', cost: 320, desc: 'Burns 4/s for 4s', set: { burnDps: 4, burnDur: 4 } },
-        { name: 'Inferno Gel', cost: 720, desc: 'Burns 8/s for 5s, +1 damage', set: { burnDps: 8, burnDur: 5 }, add: { damage: 1 } },
+        { name: 'Napalm Sap', cost: 320, desc: 'Burns 4/s for 4s; blasts scorch the trail itself for 3s', set: { burnDps: 4, burnDur: 4, burnGround: 3 } },
+        { name: 'Inferno Gel', cost: 720, desc: 'Burns 8/s for 5s, +1 damage; scorched ground lingers 4s', set: { burnDps: 8, burnDur: 5, burnGround: 4 }, add: { damage: 1 } },
       ]},
     },
   },
@@ -104,8 +104,8 @@ export const TOWERS = {
   },
 
   army: {
-    name: 'Army Ant Camp', cost: 650, footprint: 15, hotkey: '6',
-    tagline: 'Drops ant ambush piles on the trail. Ambushes hit anything — even camo and armor.',
+    name: 'Army Ant Camp', cost: 450, footprint: 15, hotkey: '6',
+    tagline: 'Trail ambushes that DUMP every charge on the first big bug. Hit anything — even camo and armor.',
     color: '#7a2d1c', dark: '#3d130a',
     base: { attack: 'trap', damageType: 'crush', range: 100, cooldown: 3.0, damage: 1, trapCharges: 8, maxPiles: 2, trapRadius: 26 },
     paths: {
@@ -131,12 +131,12 @@ export const TOWERS = {
       a: { name: 'Venom', tiers: [
         { name: 'Royal Venom', cost: 500, desc: '+2 damage', add: { damage: 2 } },
         { name: 'Dissolving Spit', cost: 1100, desc: '+2 damage, melts armored Pillbugs', add: { damage: 2 }, set: { shred: true } },
-        { name: "Queen's Champion", cost: 2600, desc: '+6 damage, +3 pierce, huge globs', add: { damage: 6, pierce: 3 }, set: { projScale: 1.8 } },
+        { name: "Queen's Champion", cost: 2600, desc: '+4 damage, +3 pierce, huge globs', add: { damage: 4, pierce: 3 }, set: { projScale: 1.8 } },
       ]},
       b: { name: 'Fervor', tiers: [
         { name: 'Battle Rhythm', cost: 450, desc: '25% faster attacks', mul: { cooldown: 0.75 } },
         { name: 'Frenzied Court', cost: 1000, desc: '35% faster still, +1 pierce', mul: { cooldown: 0.65 }, add: { pierce: 1 } },
-        { name: 'Hypersonic', cost: 2400, desc: 'Twin shots at blinding speed', mul: { cooldown: 0.5 }, set: { multishot: 2 } },
+        { name: 'Hypersonic', cost: 2400, desc: 'Twin shots at blinding speed', mul: { cooldown: 0.55 }, set: { multishot: 2 } },
       ]},
     },
   },

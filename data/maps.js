@@ -14,7 +14,9 @@ export const MAPS = [
     bg: 'picnic', unlock: null,
     // the hour of light: every map commits to a time of day (render reads `light`)
     light: { mood: 'golden', clouds: true, motes: 'seed' },
-    blurb: 'A lazy S-curve across the family blanket. Long marches, easy pickings.',
+    // map twist: the jam jar drips — a sticky puddle lands somewhere new each round
+    twist: { type: 'jamdrip', r: 46, slow: 0.65 },
+    blurb: 'A lazy S-curve across the family blanket. The jam jar drips somewhere new each round — bugs wade through it.',
     paths: [
       [[-40, 130], [360, 130], [360, 330], [140, 330], [140, 520], [1000, 520]],
     ],
@@ -30,7 +32,9 @@ export const MAPS = [
     id: 'garden', name: 'Garden Path', tag: 'Tricky',
     bg: 'garden', unlock: { best: 12, label: 'Reach round 12 on any map' },
     light: { mood: 'morning', clouds: true, motes: 'pollen' },
-    blurb: 'The trail loops back over itself. Watch both lanes of the crossing.',
+    // map twist: the pond mists at round start — ants near the water see camo through it
+    twist: { type: 'pondmist', dur: 10, r: 150 },
+    blurb: 'The trail loops back over itself. At each round\'s start the pond mists — ants near the water see everything.',
     paths: [
       [[-40, 260], [620, 260], [620, 110], [300, 110], [300, 460], [1000, 460]],
     ],

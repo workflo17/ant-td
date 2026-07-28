@@ -67,24 +67,27 @@ export const ENEMIES = {
     color: '#5a4030', dark: '#241407', children: [['pillbug', 3]],
     boss: true, armored: true, hpBar: true, slowResist: 0.6, stunImmune: true,
     charge: { every: 6, dur: 1.2, mul: 2.2, tele: 1.5 },
+    toss: true, // once, under half health: flings the nearest guard post aside
     desc: 'Armored 320 HP mid-boss. It digs in for a long moment — then CHARGES.',
     hint: 'Explosions, crush & shred only — brace for the charge!',
     introSub: 'It charges every 6 seconds!',
   },
   caterpillar: {
     name: 'Caterpillar', hp: 200, speed: 26, radius: 27, rank: 7,
-    color: '#8bc34a', dark: '#33691e', children: [['snail', 4]],
+    color: '#8bc34a', dark: '#33691e', children: [['snail', 2]],
     boss: true, segmented: true, hpBar: true, slowResist: 0.5, stunImmune: true,
-    desc: 'A 200 HP segmented blimp of a bug. Spawns 4 Snails on death.',
-    hint: 'Sustained DPS — it bursts into Snails.',
-    introSub: 'It bursts into Snails!',
+    shedAt: [0.75, 0.5, 0.25], // wounded thresholds: it sheds a Snail at each
+    desc: 'A 200 HP segmented blimp. Sheds Snails as you wound it — 2 more on death.',
+    hint: 'Sustained DPS — every wound births a Snail.',
+    introSub: 'It sheds Snails as it bleeds!',
   },
   hornetQueen: {
     name: 'Hornet Queen', hp: 700, speed: 19, radius: 37, rank: 8,
     color: '#ffb020', dark: '#7a4a00', children: [['caterpillar', 4]],
     boss: true, wings: true, stripes: true, hpBar: true, slowResist: 0.75, stunImmune: true,
-    desc: 'The final boss. 700 HP, spawns 4 Caterpillars on death.',
-    hint: 'Everything you have. She rages at half health.',
+    escortEvery: 12, // she raises a wasp escort to the air lane while she walks
+    desc: 'The final boss. 700 HP, raises wasp escorts, spawns 4 Caterpillars on death.',
+    hint: 'Everything you have — and keep the sky covered. She rages at half health.',
     introSub: 'Protect the stash!',
   },
 };

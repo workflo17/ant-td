@@ -1,13 +1,18 @@
 // ===== Game orchestrator: economy, rounds, placement, buffs, win/lose =====
 import { WORLD_W, WORLD_H, PATH_HALF_W } from '../data/maps.js';
-import { WAVES, freeplayRound, freeplayHpMul, roundBonus, easyAdjust, hardAdjust, START_SUGAR, START_CRUMBS, DIFFICULTY, DECOY, HONEYPOT_STACK } from '../data/waves.js';
+import { WAVES, freeplayRound, freeplayHpMul, roundBonus, easyAdjust, hardAdjust, START_SUGAR, START_CRUMBS, DIFFICULTY, DECOY, HONEYPOT_STACK, ROUND_MODS } from '../data/waves.js';
+import { REGEN_CHAIN } from '../data/enemies.js';
+
+// BROOD rounds / Broodmother: every chain bug spawns one step up its ladder
+const CHAIN_UP = {};
+for (let i = 0; i < REGEN_CHAIN.length - 1; i++) CHAIN_UP[REGEN_CHAIN[i]] = REGEN_CHAIN[i + 1];
 import { XP_LEVELS, ABILITY_UNLOCK_LEVEL, ABILITY2_UNLOCK_LEVEL } from '../data/heroes.js';
 import { RELICS, ASCEND_COST, ASCEND_GROWTH } from '../data/relics.js';
 import { PERKS } from '../data/perks.js';
 import { STAR_REWARDS } from '../data/starRewards.js';
 import { TOWER_ORDER } from '../data/towers.js';
 import { ENEMIES } from '../data/enemies.js';
-import { dist2, TAU } from './util.js';
+import { dist2, TAU, mulberry32 } from './util.js';
 import { TOWERS, SELL_RATIO } from '../data/towers.js';
 import { buildPath, distToPath, dist, posAt } from './util.js';
 import * as EN from './enemies.js';
@@ -71,6 +76,17 @@ export class Game {
     this.time = 0;
     this.roundTime = 0;
     this.hpMul = 1;
+    this.roundSpeedMul = 1;   // STAMPEDE rounds crank this
+    this.roundMod = null;     // active overtime round modifier
+    this.bgOverride = null;   // NIGHT FALLS / Nocturne: the map re-bakes dark
+    this.burnPatches = [];    // napalm scorched ground
+    this.popMul = 1;          // Sugar-Free Colony: pops pay x3
+    this.freeplaySeed = mods.fpSeed != null ? mods.fpSeed : Math.floor(Date.now() / 604800000); // epoch-week
+    this.jamPuddle = null;    // picnic twist: the jam jar drips a migrating sticky puddle
+    this.mistT = 0;           // garden twist: pond mist reveals camo near the water
+    this.mistPond = mapDef.twist && mapDef.twist.type === 'pondmist'
+      ? mapDef.blockers.find(bl => bl.type === 'pond') : null;
+    this.towersPlacedCount = 0;
 
     this.enemies = [];
     this.freeEnemies = [];
@@ -151,7 +167,9 @@ export class Game {
   }
 
   cost(typeId) {
-    return Math.round(TOWERS[typeId].cost * this.diff.costMul);
+    let c = TOWERS[typeId].cost * this.diff.costMul;
+    if (typeId === 'beacon' && this.mods.camo) c *= 0.5; // Camo Chaos: scent is half price — a fair fight
+    return Math.round(c);
   }
   tierCost(def, pk, i) {
     return Math.round(def.paths[pk].tiers[i].cost * this.diff.costMul);
@@ -166,13 +184,39 @@ export class Game {
     if (this.state !== 'idle' || this.paused) return false;
     this.round++;
     this.hpMul = freeplayHpMul(this.round) * (this.diff.hpMul || 1);
-    let groups = this.round <= WAVES.length ? WAVES[this.round - 1] : freeplayRound(this.round);
+    this.roundSpeedMul = 1;
+    let groups = this.round <= WAVES.length ? WAVES[this.round - 1] : freeplayRound(this.round, this.freeplaySeed);
     if (this.diffKey === 'easy') groups = easyAdjust(groups, this.round);
     else if (this.diffKey === 'hard') groups = hardAdjust(groups, this.round);
+    // overtime named modifiers (r41-60) + the Broodmother challenge chip
+    const rmod = this.round <= 60 ? ROUND_MODS[this.round] : null;
+    this.roundMod = rmod || null;
+    if (rmod && rmod.id === 'stampede') {
+      this.roundSpeedMul = 1.4;
+      groups = groups.map(gr => ({ ...gr, n: Math.max(1, Math.ceil(gr.n * 0.7)) }));
+    }
+    if ((rmod && rmod.id === 'brood') || this.mods.brood) {
+      groups = groups.map(gr => ({ ...gr, t: CHAIN_UP[gr.t] || gr.t }));
+    }
+    if (rmod && rmod.id === 'night' && !this.bgOverride) {
+      this.bgOverride = 'night';
+      if (this.hooks.onRebake) this.hooks.onRebake();
+    }
+    // picnic twist: the jam puddle drips somewhere new each round (seeded — resume-stable)
+    const twist = this.map.twist;
+    if (twist && twist.type === 'jamdrip') {
+      const rng = mulberry32(9000 + this.round);
+      const path = this.paths[0];
+      const spot = { x: 0, y: 0, angle: 0, seg: 0 };
+      posAt(path, (0.25 + rng() * 0.6) * path.length, spot, 0);
+      this.jamPuddle = { x: spot.x, y: spot.y, r: twist.r, slow: twist.slow };
+    }
+    if (twist && twist.type === 'pondmist' && this.mistPond) this.mistT = twist.dur;
+    const armoredRound = !!(rmod && rmod.id === 'armored');
     const events = [];
     for (const gr of groups) {
       for (let i = 0; i < gr.n; i++) {
-        events.push({ at: gr.delay + i * gr.gap, t: gr.t, camo: gr.camo, regen: gr.regen });
+        events.push({ at: gr.delay + i * gr.gap, t: gr.t, camo: gr.camo, regen: gr.regen, armored: armoredRound });
       }
     }
     events.sort((a, b) => a.at - b.at);
@@ -191,6 +235,7 @@ export class Game {
         sub = 'Leaked: ' + leaked.sort((a, b) => b[1] - a[1]).map(([n, c]) => `${c}× ${n}`).join(', ');
       }
     }
+    if (rmod) sub = `${rmod.name} — ${rmod.sub}`; // named overtime rounds announce themselves
     this.leakTally = {};
     this.roundLeaks = 0;
     this.roundBanner = { text: `ROUND ${this.round}`, sub, t: 1.6, dur: 1.6 };
@@ -223,6 +268,8 @@ export class Game {
       abilityUses: this.abilityUses,
       ascensions: this.ascensions,
       powersCast: this.powersCast,
+      freeplaySeed: this.freeplaySeed,
+      towersPlacedCount: this.towersPlacedCount,
       powerCd: { rain: Math.ceil(this.powerCd.rain), guards: Math.ceil(this.powerCd.guards) },
       relics: Object.keys(this.relics),
       unlockedTypes: this.unlockedTypes ? [...this.unlockedTypes] : null,
@@ -279,6 +326,8 @@ export class Game {
     }
     this.ascensions = s.ascensions != null ? s.ascensions : (s.ascensionUsed ? 1 : 0);
     this.powersCast = s.powersCast || 0;
+    if (s.freeplaySeed != null) this.freeplaySeed = s.freeplaySeed;
+    this.towersPlacedCount = s.towersPlacedCount || this.towers.length;
     if (s.powerCd) this.powerCd = { rain: s.powerCd.rain || 0, guards: s.powerCd.guards || 0 };
     this.decoys = (s.decoys || []).map(d => ({
       x: d.x, y: d.y, bites: d.bites, biteT: 0, eaters: 0, phase: Math.random() * 10,
@@ -333,7 +382,15 @@ export class Game {
 
   endRound() {
     this.state = 'idle';
-    const bonus = Math.round(roundBonus(this.round) * this.incomeMul) + (this.relicIncome || 0);
+    this.roundSpeedMul = 1;
+    if (this.roundMod && this.roundMod.id === 'night' && !this.relics.nocturne) {
+      this.bgOverride = null; // dawn breaks after a NIGHT FALLS round
+      if (this.hooks.onRebake) this.hooks.onRebake();
+    }
+    this.roundMod = null;
+    this.burnPatches.length = 0;
+    // Sugar-Free Colony: no salary — the colony lives on pops alone (x3, see hitEnemy)
+    const bonus = (this.relics.sugarfree ? 0 : Math.round(roundBonus(this.round) * this.incomeMul)) + (this.relicIncome || 0);
     this.sugar += bonus;
     this.stats.earned += bonus;
     // honeypot income (each extra pot pays less — see HONEYPOT_STACK), then interest
@@ -439,7 +496,7 @@ export class Game {
       const q = this.spawnQueue;
       while (this.spawnIdx < q.length && q[this.spawnIdx].at <= this.roundTime) {
         const ev = q[this.spawnIdx++];
-        this.spawnEnemy(ev.t, { camo: ev.camo, regen: ev.regen, hpMul: this.hpMul });
+        this.spawnEnemy(ev.t, { camo: ev.camo, regen: ev.regen, armored: ev.armored, hpMul: this.hpMul });
       }
     }
 
@@ -476,8 +533,10 @@ export class Game {
     for (const t of this.towers) TW.updateTower(this, t, dt);
     updateProjectiles(this, dt);
     this.stepTraps();
+    this.stepBurnPatches();
     this.stepGuards(dt);
     this.stepDecoys(dt);
+    this.mistT = Math.max(0, this.mistT - dt);
 
     if (this.state === 'inround' && this.spawnIdx >= this.spawnQueue.length && this.enemies.length === 0) {
       this.endRound();
@@ -547,7 +606,10 @@ export class Game {
     if (expired) this.guards = this.guards.filter(gd => this.time <= gd.until);
   }
 
-  // ambush piles bite anything that walks over them — camo and armor included
+  // ambush piles bite anything that walks over them — camo and armor included.
+  // The anti-tank rule: the first BIG bug (boss, shell, armor, or 3+ hp) that steps
+  // on a pile triggers the whole warband — every remaining charge dumps at once,
+  // and overkill carries down the chain.
   stepTraps() {
     if (!this.traps.length) return;
     let anyDead = false;
@@ -560,12 +622,40 @@ export class Game {
         const rr = tr.r + e.type.radius;
         const dx = e.x - tr.x, dy = e.y - tr.y;
         if (dx * dx + dy * dy > rr * rr) continue;
-        this.creditDamage('Army Ant Camp', EN.hitEnemy(this, e, tr.dmg, 'crush', TRAP_PERK));
-        tr.charges--;
+        const big = e.type.boss || e.type.shell || e.armored || e.hp >= 3;
+        if (big && tr.charges > 1) {
+          this.creditDamage('Army Ant Camp', EN.hitEnemy(this, e, tr.dmg * tr.charges, 'crush', TRAP_PERK));
+          tr.charges = 0;
+          burst(tr.x, tr.y, '#7a2d1c', 14, 190);
+          ring(tr.x, tr.y, '#ffd9c2', 8, 190, 0.3);
+          textPop(tr.x, tr.y - 18, 'AMBUSH!', '#ff9d8a', 15);
+          sfx.snap();
+        } else {
+          this.creditDamage('Army Ant Camp', EN.hitEnemy(this, e, tr.dmg, 'crush', TRAP_PERK));
+          tr.charges--;
+        }
       }
       if (tr.charges <= 0) { tr.dead = true; anyDead = true; }
     }
     if (anyDead) this.traps = this.traps.filter(tr => !tr.dead);
+  }
+
+  // napalm scorched ground: anything crossing a live patch keeps burning
+  stepBurnPatches() {
+    if (!this.burnPatches.length) return;
+    let anyDead = false;
+    for (const bp of this.burnPatches) {
+      if (this.time > bp.until) { bp.dead = true; anyDead = true; continue; }
+      const n = this.enemies.length;
+      for (let i = 0; i < n; i++) {
+        const e = this.enemies[i];
+        if (e.dead || e.type.flying) continue;
+        const rr = bp.r + e.type.radius;
+        if (dist2(e.x, e.y, bp.x, bp.y) > rr * rr) continue;
+        EN.applyBurn(this, e, bp.dps, 0.6); // refreshed while they stand in the fire
+      }
+    }
+    if (anyDead) this.burnPatches = this.burnPatches.filter(bp => !bp.dead);
   }
 
   // ---- Sugar Decoy: a placeable snack that stalls the march ----
@@ -647,7 +737,12 @@ export class Game {
     e.dead = true;
     if (this.god) return;
     // ceil: veteran ants deal fractional damage, but lives stay whole numbers
-    const val = Math.ceil(EN.leakValue(e));
+    let val = Math.ceil(EN.leakValue(e));
+    // bosses WOUND, they don't execute: half your crumbs (min 30). Two boss leaks
+    // still kill — one is a comeback story. Crumbs of Steel keeps the full price.
+    if (e.type.boss && !this.mods.steel) {
+      val = Math.min(val, Math.max(30, Math.ceil(this.crumbs * 0.5)));
+    }
     this.crumbs = Math.max(0, this.crumbs - val);
     this.stats.leaks += val;
     this.roundLeaks++;
@@ -705,9 +800,16 @@ export class Game {
     }
     if (relic.id === 'sugarrush') this.incomeMul *= 1.25;
     if (relic.id === 'stickyground') this.speedMul *= 0.92;
-    if (relic.id === 'tailwind') this.speedMul *= 0.94;
     if (relic.id === 'academy') this.starMul *= 1.5;
     if (relic.id === 'supply') this.relicIncome = (this.relicIncome || 0) + 40;
+    // build-arounds: these change HOW you play, not just a number
+    if (relic.id === 'sugarfree') this.popMul = 3; // salary skipped in endRound
+    if (relic.id === 'glass' && !silent) this.crumbs = Math.max(1, this.crumbs - 50);
+    if (relic.id === 'dowry') this.ascendMul = (this.ascendMul || 1) * 0.5;
+    if (relic.id === 'nocturne') {
+      this.bgOverride = 'night';
+      if (this.hooks.onRebake) this.hooks.onRebake();
+    }
     this.recomputeBuffs();
     if (this.hooks.onChange) this.hooks.onChange();
   }
@@ -896,10 +998,12 @@ export class Game {
 
   placeTower(typeId, x, y) {
     if (this.unlockedTypes && !this.unlockedTypes.has(typeId)) { sfx.deny(); return null; } // draft it first
+    if (this.relics.dowry && this.round >= 25) { sfx.deny(); return null; } // Queen's Dowry: the roster is sealed
     const c = this.cost(typeId);
     if (this.sugar < c) { sfx.deny(); return null; }
     if (!this.canPlace(typeId, x, y)) { sfx.deny(); return null; }
     this.sugar -= c;
+    this.towersPlacedCount++;
     const t = TW.makeTower(this, typeId, x, y);
     t.spent = c;
     if (this.vetSeed) t.dealt = this.vetSeed; // Veteran Colony: 25 layers of credit on day one
@@ -981,14 +1085,24 @@ export class Game {
     }
     // Foraging Run relic passives
     if (this.relics.scentmaster) this.globalDetect = true;
+    // Monoculture: your most-placed attacking ant type gets +25%, everything else -10%
+    let topType = null;
+    if (this.relics.monoculture) {
+      const counts = {};
+      for (const t of this.towers) {
+        if (t.isHero || !t.def.base.attack) continue;
+        counts[t.typeId] = (counts[t.typeId] || 0) + 1;
+        if (!topType || counts[t.typeId] > counts[topType]) topType = t.typeId;
+      }
+    }
     for (const t of this.towers) {
       if (!t.def.base.attack) continue;
       if (this.relics.antennae) t.buffRange *= 1.1;
-      if (this.relics.compound) t.buffRange *= 1.1;
       if (this.relics.quicklegs) t.buffRate *= 1.1;
-      if (this.relics.wardrums) t.buffRate *= 1.1;
       if (this.relics.mandibles) t.buffDmgAdd += 1;
-      if (this.relics.venom) t.buffDmgAdd += 1;
+      if (this.relics.glass) t.buffDmgAdd += 2;
+      if (this.relics.nocturne) t.buffRate *= 1.1;
+      if (topType) t.buffDmg *= t.typeId === topType ? 1.25 : 0.9;
       t.buffBlast = this.relics.bigboom ? 1.25 : 1;
       TW.recomputeStats(t);
     }

@@ -1,6 +1,6 @@
 // ===== Enemy runtime: spawning, movement, layered damage, statuses =====
 import { ENEMIES, REGEN_CHAIN, REGEN_INTERVAL } from '../data/enemies.js';
-import { posAt, jitterColor } from './util.js';
+import { posAt, jitterColor, dist2 } from './util.js';
 import { burst, ring, textPop, burstChunks, popFx } from './particles.js';
 import { addDecal } from './render.js';
 import { sfx } from './sound.js';
@@ -46,6 +46,10 @@ export function initEnemy(game, e, typeId, opts) {
   e.phase = Math.random() * 100;
   e.camo = !!opts.camo;
   e.regen = !!opts.regen;
+  e.armored = !!(e.type.armored || opts.armored); // per-instance: ARMORED WAVE rounds plate anything
+  e.shedIdx = 0;    // caterpillar wound-thresholds already crossed
+  e.escortT = 0;    // queen: time since her last wasp escort
+  e.tossed = false; // stag: antler toss spent
   const li = REGEN_CHAIN.indexOf(typeId);
   e.regenTop = opts.regenTop != null ? opts.regenTop : (e.regen && li >= 0 ? li : -1);
   e.regenT = 0;
@@ -73,6 +77,8 @@ function transform(game, e, typeId) {
   e.type = ENEMIES[typeId];
   e.rageSpeed = 1; // a popped queen's brood doesn't inherit her rage
   e.chargeT = 0; e.teleT = 0; e.chargingT = 0; // a popped charger's children don't inherit the burst
+  e.armored = !!e.type.armored; // round-mod plates don't survive the pop
+  e.shedIdx = 0; e.escortT = 0; e.tossed = false;
   e.hp = scaledHp(typeId, e.hpMul);
   e.maxHp = e.hp;
   e.jfill = e.type.boss ? null : jitterColor(e.type.color, Math.random() * 14 - 7, Math.random() * 8 - 4);
@@ -131,13 +137,15 @@ export function hitEnemy(game, e, amount, dtype, perk) {
     ring(e.x, e.y, '#ffd166', e.type.radius + 4, 80, 0.15);
     return 0;
   }
-  if (e.type.armored && dtype !== 'explosion' && dtype !== 'crush' && !(perk && perk.shred)) {
+  if (e.armored && dtype !== 'explosion' && dtype !== 'crush' && !(perk && perk.shred)) {
     sfx.clink();
     ring(e.x, e.y, '#cfd6e0', e.type.radius + 2, 60, 0.15);
     return 0;
   }
   let dmg = amount;
   if (perk && perk.shellBonus && (e.type.shell || e.type.boss)) dmg += perk.shellBonus;
+  // weaver synergy: a rooted bug can't brace — crushing jaws hit +1 harder
+  if (dtype === 'crush' && game.time < e.snareUntilT) dmg += 1;
   let dealt = 0;
   let guard = 0;
   while (dmg > 0 && !e.dead && guard++ < 60) {
@@ -148,8 +156,9 @@ export function hitEnemy(game, e, amount, dtype, perk) {
     if (e.hp <= 0) popLayer(game, e);
   }
   if (dealt > 0) {
-    game.sugar += dealt * game.incomeMul;
-    game.stats.earned += dealt * game.incomeMul;
+    const pay = dealt * game.incomeMul * (game.popMul || 1); // Sugar-Free Colony: pops pay x3
+    game.sugar += pay;
+    game.stats.earned += pay;
     game.stats.pops += dealt;
     e.hitT = 0.15;
     // feed the HUD coin-fly (ui batches these into flying sugar)
@@ -159,6 +168,37 @@ export function hitEnemy(game, e, amount, dtype, perk) {
   }
   if (e.typeId === 'hornetQueen' && !e.enraged && !e.dead && e.hp <= e.maxHp * 0.5) {
     queenRage(game, e);
+  }
+  // caterpillar: every wound threshold crossed births a snail behind it (data: shedAt)
+  const sheds = e.type.shedAt;
+  if (sheds && !e.dead) {
+    while (e.shedIdx < sheds.length && e.hp <= e.maxHp * sheds[e.shedIdx]) {
+      e.shedIdx++;
+      const kid = game.spawnEnemy('snail', {
+        dist: Math.max(0, e.dist - 24 * e.shedIdx), pathIdx: e.pathIdx,
+        camo: e.camo, hpMul: e.hpMul,
+      });
+      ring(kid.x, kid.y, '#8bc34a', 10, 140, 0.3);
+      textPop(e.x, e.y - e.type.radius - 10, 'SHED!', '#b6d94a', 13);
+      sfx.pop(16);
+    }
+  }
+  // stag: once, under half health, it flings the nearest guard post aside
+  if (e.type.toss && !e.tossed && !e.dead && e.hp <= e.maxHp * 0.5) {
+    e.tossed = true;
+    let best = null, bestD = 150 * 150;
+    for (const gd of game.guards) {
+      const dd = (gd.x - e.x) ** 2 + (gd.y - e.y) ** 2;
+      if (dd < bestD) { bestD = dd; best = gd; }
+    }
+    if (best) {
+      best.until = game.time; // squad scattered
+      burst(best.x, best.y, '#ffd9c2', 14, 220);
+      ring(e.x, e.y, '#ffd166', e.type.radius + 6, 240, 0.4);
+      textPop(best.x, best.y - 20, 'TOSSED!', '#ffb020', 15);
+      game.shake = Math.min(0.4, game.shake + 0.15);
+      sfx.snap();
+    }
   }
   return dealt;
 }
@@ -270,19 +310,42 @@ export function updateEnemy(game, e, dt) {
     }
   }
 
+  // the queen raises wasp escorts to the air lane while she walks (data: escortEvery)
+  if (e.type.escortEvery && game.state === 'inround' && !e.dead) {
+    e.escortT += dt;
+    if (e.escortT >= e.type.escortEvery) {
+      e.escortT = 0;
+      const groundLen = game.paths[e.pathIdx].length;
+      const air = game.airPaths[e.pathIdx % game.airPaths.length];
+      const esc = game.spawnEnemy('wasp', {
+        dist: Math.min(air.length - 60, (e.dist / groundLen) * air.length * 0.9),
+        pathIdx: e.pathIdx % game.airPaths.length, camo: e.camo, hpMul: e.hpMul,
+      });
+      ring(esc.x, esc.y, '#ffd23f', 8, 150, 0.3);
+      textPop(e.x, e.y - e.type.radius - 12, 'RISE!', '#ffd23f', 13);
+    }
+  }
+
   // movement
+  const path = (e.flying ? game.airPaths : game.paths)[e.pathIdx];
   const stunned = game.time < e.stunUntilT || game.time < e.snareUntilT;
   let v = 0;
   if (!stunned) {
     const slow = game.time < e.slowUntilT ? e.slowPct : 0;
     const mapMul = game.speedMulByType ? (game.speedMulByType[e.typeId] || 1) : 1;
     const hazMul = game.map.hazard && game.inHazard(e.x, e.y) ? 0.6 : 1; // shower spray bogs bugs down
-    v = e.type.speed * e.rageSpeed * chargeMul * mapMul * hazMul * game.speedMul * (1 - slow);
+    v = e.type.speed * e.rageSpeed * chargeMul * mapMul * hazMul * game.speedMul
+      * (game.roundSpeedMul || 1) * (1 - slow);
+    // picnic twist: wading through the jam puddle
+    if (game.jamPuddle && !e.flying) {
+      const jp = game.jamPuddle;
+      if (dist2(e.x, e.y, jp.x, jp.y) < (jp.r + e.type.radius * 0.5) ** 2) v *= jp.slow;
+    }
+    // Closing Time challenge: bugs sprint the final third of the trail
+    if (game.mods.closing && e.dist > path.length * 0.66) v *= 1.6;
   }
   e.curSpeed = v;
   e.dist += v * dt;
-
-  const path = (e.flying ? game.airPaths : game.paths)[e.pathIdx];
   if (e.dist >= path.length) {
     game.leakEnemy(e);
     return;

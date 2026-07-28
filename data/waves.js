@@ -74,17 +74,36 @@ export const WAVES = [
   /*60*/ [g('hornetQueen', 4, 6, 8), g('caterpillar', 8, 2, 2), g('moth', 40, 0.16, 0, { camo: true, regen: true })], // grand finale
 ];
 
+// ===== Overtime round modifiers (rounds 41-60): each named round bends one rule =====
+// Applied in startRound; the round banner announces them. All handlers are generic:
+//   armored: every spawn in the round gains plates (explosions/crush/shred only)
+//   stampede: +40% bug speed, -30% count
+//   brood: every chain bug spawns one step up its chain
+//   night: night falls on the map for this round (the v16 light pass, live)
+export const ROUND_MODS = {
+  43: { id: 'armored', name: 'ARMORED MOTHS', sub: 'Plates on everything — acid bounces off!' },
+  46: { id: 'brood', name: 'BROOD', sub: 'Every chain bug spawns one layer deeper!' }, // r46 is hopper-rich
+  48: { id: 'stampede', name: 'STAMPEDE', sub: 'Fewer bugs, far faster!' },
+  51: { id: 'night', name: 'NIGHT FALLS', sub: 'Fight on under the stars!' },
+  54: { id: 'stampede', name: 'THE HERD', sub: 'The caterpillars are RUNNING!' },
+  57: { id: 'armored', name: 'ARMORED WAVE', sub: 'Plates on everything — acid bounces off!' },
+  59: { id: 'night', name: 'MIDNIGHT COURT', sub: 'The queens arrive after dark…' },
+};
+
 // Endless freeplay past round 40: escalating mixes; boss HP scales via hpMul.
-export function freeplayRound(round) {
-  const k = round - 40;
+// `seed` (the ISO week at run start) rotates which pressures show up, so freeplay
+// has a different flavor each week instead of one fixed arithmetic pattern.
+export function freeplayRound(round, seed = 0) {
+  const k = round - 40 + (seed % 5);
   const groups = [
-    g('moth', Math.min(60, 20 + k * 2), 0.2, 0, { camo: k % 2 === 0, regen: true }),
-    g('snail', Math.min(30, 10 + k), 1.0, 3, { camo: k % 3 === 0 }),
-    g('caterpillar', Math.min(12, 2 + Math.floor(k / 2)), 3, 5),
+    g('moth', Math.min(60, 20 + (round - 40) * 2), 0.2, 0, { camo: k % 2 === 0, regen: true }),
+    g('snail', Math.min(30, 10 + (round - 40)), 1.0, 3, { camo: k % 3 === 0 }),
+    g('caterpillar', Math.min(12, 2 + Math.floor((round - 40) / 2)), 3, 5),
   ];
-  if (k % 5 === 0) groups.push(g('hornetQueen', Math.max(1, Math.floor(k / 10)), 8, 10));
-  if (k % 3 === 0) groups.push(g('pillbug', 10 + k, 0.8, 2, { camo: true }));
-  if (k % 2 === 0) groups.push(g('wasp', Math.min(30, 10 + k), 0.6, 6, { camo: k % 4 === 0 }));
+  if (k % 5 === 0) groups.push(g('hornetQueen', Math.max(1, Math.floor((round - 40) / 10)), 8, 10));
+  if (k % 3 === 0) groups.push(g('pillbug', 10 + (round - 40), 0.8, 2, { camo: true }));
+  if (k % 2 === 0) groups.push(g('wasp', Math.min(30, 10 + (round - 40)), 0.6, 6, { camo: k % 4 === 0 }));
+  if ((round + seed) % 7 === 0) groups.push(g('stagBeetle', 2, 8, 4));
   return groups;
 }
 

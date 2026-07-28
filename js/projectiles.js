@@ -19,7 +19,7 @@ export function fireProjectile(game, props) {
   p.srcName = ''; p.srcT = null;
   p.shred = false; p.shellBonus = 0; p.detect = false;
   p.slowPct = 0; p.slowDur = 0; p.snareDur = 0; p.splash = 0;
-  p.blast = 0; p.burnDps = 0; p.burnDur = 0;
+  p.blast = 0; p.burnDps = 0; p.burnDur = 0; p.burnGround = 0;
   p.sx = 0; p.sy = 0; p.tx = 0; p.ty = 0; p.t = 0; p.dur = 0.5;
   p.dead = false;
   Object.assign(p, props);
@@ -51,6 +51,15 @@ function explode(game, x, y, p) {
   const cl = Math.hypot(cx, cy) || 1;
   game.kickX += (cx / cl) * 4;
   game.kickY += (cy / cl) * 4;
+  // napalm tiers scorch the ground itself: a burn patch outlives the blast.
+  // Embers burn at HALF the direct-hit rate over a tighter circle — a zone tax,
+  // not a second exploder.
+  if (p.burnGround > 0) {
+    game.burnPatches.push({
+      x, y, r: p.blast * 0.55, dps: Math.max(1, p.burnDps * 0.5),
+      until: game.time + p.burnGround, dur: p.burnGround, dead: false,
+    });
+  }
   const bb = p.blast;
   const nEnemies = game.enemies.length; // snapshot: one blast hits one wave, not spawned children
   for (let ei = 0; ei < nEnemies; ei++) {

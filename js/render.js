@@ -96,7 +96,10 @@ export function bakeMap(game) {
   b.scale(DPR, DPR);
   const rng = mulberry32(1234);
   const style = game.map.bg;
-  const light = game.map.light || {};
+  // NIGHT FALLS / Nocturne: keep the map's own ground, but night LIGHTING takes over
+  const nightOver = !!game.bgOverride && style !== 'night';
+  const nightLook = style === 'night' || nightOver;
+  const light = nightOver ? {} : (game.map.light || {});
   const lowSun = light.mood === 'golden' || light.mood === 'late' || light.mood === 'window';
   kitchenWedge = null;
   buildLightSprites();
@@ -402,7 +405,12 @@ export function bakeMap(game) {
   drawBasketGoal(b, Math.min(gx, WORLD_W - 44), gy, game.starRewards && game.starRewards.goldenanthill);
   b.restore();
 
-  if (style === 'night') {
+  if (nightLook) {
+    // night fell on a day map: drown the ground in indigo before the lamps come up
+    if (nightOver) {
+      b.fillStyle = 'rgba(22,18,52,0.62)';
+      b.fillRect(0, 0, WORLD_W, WORLD_H);
+    }
     // warm lamplight pools around every lantern + a porch-door spill — baked radial glows
     const pools = game.map.blockers.filter(bl => bl.type === 'lantern').map(bl => [bl.x, bl.y, 190]);
     pools.push([WORLD_W * 0.48, WORLD_H * 0.06, 230]); // light from the house door
@@ -537,13 +545,13 @@ export function bakeMap(game) {
   // 1) knock the ground's saturation down a notch (moving actors stay full-color and pop)
   b.save();
   b.globalCompositeOperation = 'saturation';
-  b.globalAlpha = style === 'night' ? 0.10 : 0.17;
+  b.globalAlpha = nightLook ? 0.10 : 0.17;
   b.fillStyle = '#808080';
   b.fillRect(0, 0, WORLD_W, WORLD_H);
   b.restore();
   // 2) warm light-pool lifts the center of the play area
   const pool = b.createRadialGradient(WORLD_W * 0.5, WORLD_H * 0.44, 40, WORLD_W * 0.5, WORLD_H * 0.48, WORLD_H * 0.78);
-  pool.addColorStop(0, style === 'night' ? 'rgba(255,214,150,0.06)' : 'rgba(255,249,228,0.10)');
+  pool.addColorStop(0, nightLook ? 'rgba(255,214,150,0.06)' : 'rgba(255,249,228,0.10)');
   pool.addColorStop(1, 'rgba(255,249,228,0)');
   b.fillStyle = pool;
   b.fillRect(0, 0, WORLD_W, WORLD_H);
@@ -551,8 +559,8 @@ export function bakeMap(game) {
   // art direction pass: vignette + film grain, baked once (tighter + deeper than a flat wash)
   const vg = b.createRadialGradient(WORLD_W / 2, WORLD_H * 0.46, WORLD_H * 0.30, WORLD_W / 2, WORLD_H * 0.5, WORLD_H * 0.95);
   vg.addColorStop(0, 'rgba(45,22,40,0)');
-  vg.addColorStop(0.68, style === 'night' ? 'rgba(8,4,20,0.12)' : 'rgba(40,20,34,0.07)');
-  vg.addColorStop(1, style === 'night' ? 'rgba(8,4,20,0.58)' : 'rgba(40,20,34,0.40)'); // night hugs the lamplight
+  vg.addColorStop(0.68, nightLook ? 'rgba(8,4,20,0.12)' : 'rgba(40,20,34,0.07)');
+  vg.addColorStop(1, nightLook ? 'rgba(8,4,20,0.58)' : 'rgba(40,20,34,0.40)'); // night hugs the lamplight
   b.fillStyle = vg;
   b.fillRect(0, 0, WORLD_W, WORLD_H);
   for (let i = 0; i < 900; i++) {
@@ -1446,7 +1454,7 @@ export function draw(game, ui, time) {
     const spot = { x: 0, y: 0, angle: 0, seg: 0 };
     const SP = 58;
     const off = (time * 60) % SP;
-    const dusk = game.map.bg === 'night'; // after dark the scent itself glows
+    const dusk = game.map.bg === 'night' || !!game.bgOverride; // after dark the scent itself glows
     ctx.lineCap = 'round';
     for (const path of game.paths) {
       spot.seg = 0;
@@ -1479,6 +1487,64 @@ export function draw(game, ui, time) {
     const pk = (time * 0.45 + t.bob) % 1;
     ctx.strokeStyle = `rgba(99,200,240,${0.3 * (1 - pk)})`;
     ctx.beginPath(); ctx.arc(t.x, t.y, r * pk, 0, TAU); ctx.stroke();
+  }
+
+  // napalm scorched ground: molten patches cooking on the trail (under the bugs)
+  for (const bp of game.burnPatches) {
+    if (bp.dead) continue;
+    const k = Math.max(0, (bp.until - game.time) / (bp.dur || 3));
+    ctx.save();
+    ctx.globalAlpha = 0.5 * k + 0.15;
+    ctx.fillStyle = 'rgba(226,118,42,0.4)';
+    ctx.beginPath(); ctx.ellipse(bp.x, bp.y, bp.r, bp.r * 0.8, 0, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) { // crawling embers
+      const a = time * 2.2 + i * 1.7 + bp.x;
+      ctx.fillStyle = `rgba(255,160,60,${0.5 * k})`;
+      ctx.beginPath();
+      ctx.arc(bp.x + Math.cos(a) * bp.r * 0.5, bp.y + Math.sin(a * 1.3) * bp.r * 0.4, 2.2, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // picnic twist: the jam puddle glistens where it dripped this round
+  if (game.jamPuddle) {
+    const jp = game.jamPuddle;
+    ctx.save();
+    ctx.fillStyle = 'rgba(201,58,78,0.45)';
+    ctx.strokeStyle = 'rgba(122,26,40,0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(jp.x, jp.y, jp.r, jp.r * 0.78, 0.3, 0, TAU);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; // gloss
+    ctx.beginPath(); ctx.ellipse(jp.x - jp.r * 0.3, jp.y - jp.r * 0.25, jp.r * 0.35, jp.r * 0.16, -0.4, 0, TAU); ctx.fill();
+    const drip = (time * 0.5) % 1; // a fresh drip falls from above now and then
+    if (drip < 0.12) {
+      ctx.fillStyle = 'rgba(201,58,78,0.7)';
+      ctx.beginPath(); ctx.ellipse(jp.x, jp.y - 30 + drip * 250, 3, 5, 0, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // garden twist: pond mist at round start — ants inside see camo through it
+  if (game.mistT > 0 && game.mistPond) {
+    const p = game.mistPond, r = game.map.twist.r;
+    const k = Math.min(1, game.mistT / 2);
+    ctx.save();
+    ctx.globalAlpha = 0.5 * k;
+    const mg = ctx.createRadialGradient(p.x, p.y, p.r, p.x, p.y, r);
+    mg.addColorStop(0, 'rgba(230,245,250,0.55)');
+    mg.addColorStop(1, 'rgba(230,245,250,0)');
+    ctx.fillStyle = mg;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(230,245,250,${0.5 * k})`;
+    ctx.setLineDash([8, 10]);
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 
   // army-ant ambush piles (under the bugs)

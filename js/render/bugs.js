@@ -86,9 +86,9 @@ export function drawBugBody(c, e, time) {
     c.restore();
   }
 
-  // pillbug plates
-  if (t.plates) {
-    c.strokeStyle = dark;
+  // pillbug plates — also the tell on ARMORED-round bugs (steel-gray banding)
+  if (t.plates || e.armored) {
+    c.strokeStyle = t.plates ? dark : 'rgba(151,161,176,0.9)';
     c.lineWidth = 3;
     for (let i = -1; i <= 1; i++) {
       c.beginPath();

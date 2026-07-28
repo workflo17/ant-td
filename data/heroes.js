@@ -14,10 +14,10 @@ export const HEROES = {
       { add: { range: 12, maxTargets: 2 } },
       { add: { damage: 1 } },
       { mul: { cooldown: 0.85 } },
-      { add: { damage: 2, range: 10 } },
+      { add: { damage: 1, range: 10 } },
       { add: { maxTargets: 4 } },
-      { mul: { cooldown: 0.8 }, add: { damage: 2 } },
-      { add: { damage: 4, range: 18 }, set: { stunChance: 0.25, stunDur: 0.6 } }, // L10
+      { mul: { cooldown: 0.8 }, add: { damage: 1 } },
+      { add: { damage: 3, range: 18 }, set: { stunChance: 0.25, stunDur: 0.6 } }, // L10
     ],
     ability: { kind: 'rally', name: 'Rally Cry', desc: 'All ants attack 50% faster for 10s', cooldown: 45, dur: 10 },
     ability2: { kind: 'ironwall', name: 'Iron Wall', desc: 'An elite guard post holds the exit for 6s — heavy bites, 80% slow', cooldown: 90, dur: 6 },
@@ -87,7 +87,8 @@ export const HEROES = {
 };
 
 export const HERO_ORDER = ['formica', 'vespula', 'melissa', 'sergeant'];
-// total popped layers required to REACH level index+1 (L1 free, L10 max)
-export const XP_LEVELS = [0, 150, 400, 800, 1400, 2200, 3200, 4500, 6000, 8000];
+// total popped layers required to REACH level index+1 (L1 free, L10 max).
+// Stretched ~1.4x past L5 (M2 hero diet): heroes are moments, not a free DPS anchor.
+export const XP_LEVELS = [0, 150, 400, 800, 1400, 3100, 4500, 6300, 8400, 11200];
 export const ABILITY_UNLOCK_LEVEL = 3;
 export const ABILITY2_UNLOCK_LEVEL = 7;
