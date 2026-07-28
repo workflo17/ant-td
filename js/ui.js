@@ -6,7 +6,7 @@ import { TOWERS, TOWER_ORDER, SELL_RATIO } from '../data/towers.js';
 import { HEROES, HERO_ORDER, XP_LEVELS, ABILITY_UNLOCK_LEVEL } from '../data/heroes.js';
 import { Game } from './game.js';
 import { bakeMap, drawTowerIcon, drawAnt, setShakeEnabled, setReducedFlash } from './render.js';
-import { startTitleScene, stopTitleScene, startMenuScene, stopMenuScene } from './title.js';
+import { startTitleScene, stopTitleScene, startMenuScene, stopMenuScene, setMenuMood } from './title.js';
 import { setReducedFx } from './particles.js';
 import { HONEYPOT_STACK } from '../data/waves.js';
 import { MODES, MODE_LABEL, effDamage, isGroundOnly, recomputeStats } from './towers.js';
@@ -629,6 +629,53 @@ function renderTrail() {
     if (!locked) node.addEventListener('click', () => { selMapId = map.id; renderMenu(); });
     els.trail.appendChild(node);
   }
+  renderTrailWalker();
+}
+
+// ---- the scout: a worker ant that walks the trail to your selection ----
+let walkerFrom = null;
+let walkerRaf = 0;
+
+function renderTrailWalker() {
+  const cv = document.createElement('canvas');
+  cv.className = 'trail-walker';
+  cv.width = 44; cv.height = 44;
+  els.trail.appendChild(cv);
+  const [nx, ny] = TRAIL_POS[selMapId] || [50, 50];
+  cv.style.left = nx + '%';
+  cv.style.top = (ny - 15) + '%';
+  const face = (dir) => { cv.style.transform = `translate(-50%, -50%) scaleX(${dir < 0 ? -1 : 1})`; };
+  const paint = (t) => {
+    const c = cv.getContext('2d');
+    c.clearRect(0, 0, 44, 44);
+    drawAnt(c, 'worker', TOWERS.worker, { x: 22, y: 26, scale: 0.6, time: t, angle: 0 });
+  };
+  cancelAnimationFrame(walkerRaf);
+  const from = walkerFrom;
+  walkerFrom = selMapId;
+  if (!from || from === selMapId || motionReduced()) { face(1); paint(0); return; }
+  // hop through every stop between the old node and the new one
+  const order = MAPS.map(m => m.id);
+  const a = order.indexOf(from), b = order.indexOf(selMapId);
+  if (a < 0 || b < 0) { face(1); paint(0); return; }
+  const dir = b > a ? 1 : -1;
+  const frames = [];
+  for (let i = a; i !== b + dir; i += dir) {
+    const [sx2, sy2] = TRAIL_POS[order[i]] || [50, 50];
+    frames.push({ left: sx2 + '%', top: (sy2 - 15) + '%' });
+  }
+  face(dir);
+  const dur = 180 + 240 * (frames.length - 1);
+  cv.animate(frames, { duration: dur, easing: 'ease-in-out' });
+  // legs actually walk for the length of the trip
+  const t0 = performance.now();
+  const gait = () => {
+    const t = (performance.now() - t0) / 1000;
+    paint(t * 2.2);
+    if (performance.now() - t0 < dur && cv.isConnected) walkerRaf = requestAnimationFrame(gait);
+    else paint(0);
+  };
+  walkerRaf = requestAnimationFrame(gait);
 }
 
 // ---- Star Rewards strip: the track under the trail — earned, never spent ----
@@ -651,6 +698,11 @@ function renderStarRewards() {
 
 export function renderMenu() {
   if (!els.mapCards) return;
+  // the meadow answers the selection: picking Night Porch dims the world to dusk
+  {
+    const selMap = MAPS.find(m => m.id === selMapId) || MAPS[0];
+    setMenuMood((selMap.light || {}).mood || (selMap.bg === 'night' ? 'night' : 'golden'));
+  }
   // trail scaffolding: heading (title · star total · view toggle) + the journey strip
   if (!els.trailWrap) {
     els.trailWrap = document.createElement('div');
@@ -723,6 +775,10 @@ export function renderMenu() {
     drawMapPreview(card.querySelector('canvas'), map, locked);
     if (!locked) {
       card.addEventListener('click', () => { selMapId = map.id; renderMenu(); });
+      // hover wakes the diorama: its trail starts marching in miniature
+      const pcv = card.querySelector('canvas');
+      card.addEventListener('mouseenter', () => startCardLife(pcv, map));
+      card.addEventListener('mouseleave', stopCardLife);
     }
     els.mapCards.appendChild(card);
   }
@@ -822,10 +878,34 @@ export function renderMenu() {
   }
 }
 
-function drawHeroIcon(c, heroDef, size = 48) {
+function drawHeroIcon(c, heroDef, size = 48, time = 0) {
   c.clearRect(0, 0, size, size);
-  drawAnt(c, 'hero', heroDef, { x: size / 2, y: size / 2 + 4, scale: size / 68, time: 0, hero: heroDef.id });
+  drawAnt(c, 'hero', heroDef, { x: size / 2, y: size / 2 + 4, scale: size / 68, time, hero: heroDef.id });
 }
+
+// ---- living icons: every ant in the tray idles instead of freezing at t=0 ----
+// A slow heartbeat (not rAF): ~4fps reads as breathing/antenna twitches and
+// costs nothing. Each icon gets a phase offset so the tray never moves in lockstep.
+let iconLifeT = 0;
+setInterval(() => {
+  if (motionReduced() || document.hidden) return;
+  iconLifeT += 0.24;
+  if (els.screenGame && !els.screenGame.classList.contains('hidden')) {
+    for (let i = 0; i < shopCards.length; i++) {
+      const { el, typeId } = shopCards[i];
+      const cv = el.querySelector('canvas');
+      if (cv) drawTowerIcon(cv.getContext('2d'), typeId, TOWERS[typeId], 52, iconLifeT + i * 1.7);
+    }
+    const heroCv = els.shop && els.shop.querySelector('.hero-deploy canvas');
+    if (heroCv && game && game.heroDef) drawHeroIcon(heroCv.getContext('2d'), game.heroDef, 52, iconLifeT);
+  } else if (els.screenMenu && !els.screenMenu.classList.contains('hidden') && loadoutOpen) {
+    const cvs = document.querySelectorAll('#hero-row .hero-card canvas');
+    cvs.forEach((cv, i) => {
+      const h = HEROES[HERO_ORDER[i]];
+      if (h) drawHeroIcon(cv.getContext('2d'), h, 48, iconLifeT + i * 2.3);
+    });
+  }
+}, 240);
 
 function drawMapPreview(cv, map, locked) {
   const c = cv.getContext('2d');
@@ -848,6 +928,70 @@ function drawMapPreview(cv, map, locked) {
     c.fillStyle = 'rgba(43,26,16,0.55)';
     c.fillRect(0, 0, cv.width, cv.height);
   }
+}
+
+// ---- hover diorama: the card wakes up and its trail starts marching ----
+
+// distance→point on a world-space polyline (loops); returns position + heading
+function pointAlong(pts, d) {
+  let total = 0;
+  const segs = [];
+  for (let i = 1; i < pts.length; i++) {
+    const len = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    segs.push(len);
+    total += len;
+  }
+  let t = ((d % total) + total) % total;
+  for (let i = 0; i < segs.length; i++) {
+    if (t <= segs[i]) {
+      const f = segs[i] ? t / segs[i] : 0;
+      return {
+        x: pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f,
+        y: pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f,
+        ang: Math.atan2(pts[i + 1][1] - pts[i][1], pts[i + 1][0] - pts[i][0]),
+        total,
+      };
+    }
+    t -= segs[i];
+  }
+  return { x: pts[0][0], y: pts[0][1], ang: 0, total };
+}
+
+let cardLife = null; // { raf, cv, map } — one card marches at a time
+
+function stopCardLife() {
+  if (!cardLife) return;
+  cancelAnimationFrame(cardLife.raf);
+  if (cardLife.cv.isConnected) drawMapPreview(cardLife.cv, cardLife.map, false);
+  cardLife = null;
+}
+
+function startCardLife(cv, map) {
+  if (motionReduced()) return;
+  stopCardLife();
+  const sx = cv.width / WORLD_W, sy = cv.height / WORLD_H;
+  const loop = () => {
+    if (!cv.isConnected) { stopCardLife(); return; }
+    drawMapPreview(cv, map, false);
+    const c = cv.getContext('2d');
+    const t = performance.now() / 1000;
+    c.fillStyle = 'rgba(43, 26, 16, 0.9)';
+    for (const pts of map.paths) {
+      const total = pointAlong(pts, 0).total;
+      const n = Math.max(3, Math.round(total / 300));
+      for (let i = 0; i < n; i++) {
+        const p = pointAlong(pts, t * 60 + (i * total) / n);
+        const bob = Math.sin(t * 9 + i * 2.1) * 0.7;
+        c.save();
+        c.translate(p.x * sx, p.y * sy + bob);
+        c.rotate(p.ang);
+        c.beginPath(); c.ellipse(0, 0, 3.4, 2.1, 0, 0, Math.PI * 2); c.fill();
+        c.restore();
+      }
+    }
+    cardLife.raf = requestAnimationFrame(loop);
+  };
+  cardLife = { raf: requestAnimationFrame(loop), cv, map };
 }
 
 // ---------- game lifecycle ----------

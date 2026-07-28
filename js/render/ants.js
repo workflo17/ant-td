@@ -638,7 +638,7 @@ export function drawAnt(c, typeId, def, opts) {
   }
 }
 
-export function drawTowerIcon(c, typeId, def, size = 56) {
+export function drawTowerIcon(c, typeId, def, size = 56, time = 0) {
   c.clearRect(0, 0, size, size);
-  drawAnt(c, typeId, def, { x: size / 2, y: size / 2 + 4, scale: size / 64, time: 0 });
+  drawAnt(c, typeId, def, { x: size / 2, y: size / 2 + 4, scale: size / 64, time });
 }

@@ -25,6 +25,53 @@ let px = 0, py = 0, tx = 0, ty = 0;
 // ambient particles
 let seeds = [], pollen = [];
 
+// ---- menu mood: the meadow answers the selected map's hour of light ----
+// Each mood is a baked full-frame grade (top→bottom wash) crossfaded over the
+// golden-hour base. 'golden' means no overlay at all.
+const MENU_MOODS = {
+  golden: null,
+  morning: { top: 'rgba(215, 232, 255, 0.30)', bot: 'rgba(120, 150, 190, 0.22)' },
+  late: { top: 'rgba(255, 150, 70, 0.30)', bot: 'rgba(118, 58, 118, 0.28)' },
+  window: { top: 'rgba(255, 214, 140, 0.30)', bot: 'rgba(92, 56, 26, 0.24)' },
+  skylight: { top: 'rgba(198, 240, 250, 0.34)', bot: 'rgba(96, 140, 150, 0.22)' },
+  night: { top: 'rgba(22, 18, 62, 0.62)', bot: 'rgba(8, 6, 28, 0.66)', stars: true },
+};
+let menuMood = 'golden';
+let moodCv = null, prevMoodCv = null;
+let moodT = 1; // crossfade 0→1
+
+function bakeMood(mood) {
+  const def = MENU_MOODS[mood];
+  if (!def || !W) return null;
+  const mc = document.createElement('canvas'); mc.width = W; mc.height = H;
+  const m = mc.getContext('2d');
+  const g = m.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, def.top);
+  g.addColorStop(1, def.bot);
+  m.fillStyle = g; m.fillRect(0, 0, W, H);
+  if (def.stars) {
+    const rng = mulberry32(9);
+    m.fillStyle = 'rgba(255, 248, 224, 0.8)';
+    for (let k = 0; k < 46; k++) {
+      const sy2 = rng() * H * 0.45;
+      m.globalAlpha = 0.25 + rng() * 0.6;
+      m.fillRect(rng() * W, sy2, 1.5, 1.5);
+    }
+    m.globalAlpha = 1;
+  }
+  return mc;
+}
+
+export function setMenuMood(mood) {
+  const key = MENU_MOODS[mood] !== undefined ? mood : 'golden';
+  if (key === menuMood) return;
+  prevMoodCv = moodCv; // mid-fade or settled: whatever shows now becomes the outgoing layer
+  menuMood = key;
+  moodCv = bakeMood(key);
+  moodT = 0;
+  if (reduced && variant === 'menu' && cv) { moodT = 1; prevMoodCv = null; drawStatic(); }
+}
+
 const HILL_COLS = ['#8fbc68', '#6ba54c', '#4e8a38'];
 const PARADE = [
   ['worker', 2.0], ['trapjaw', 2.2], ['weaver', 2.0], ['majoress', 2.7], ['honeypot', 2.3],
@@ -163,6 +210,11 @@ function bakeAll() {
     p.fillRect(rng() * W, rng() * H, 1.4, 1.4);
   }
 
+  // mood overlays are viewport-sized: rebake the active one, drop the outgoing
+  moodCv = bakeMood(menuMood);
+  prevMoodCv = null;
+  moodT = 1;
+
   // --- ambient particles (menu: a quieter drift) ---
   seeds = []; pollen = [];
   for (let k = 0; k < (menu ? 6 : 11); k++) {
@@ -272,6 +324,22 @@ function frame(now) {
 
   // blurred foreground, strongest counter-parallax = depth
   ctx.drawImage(fgCv, -60 - px * 24 * par, py * -6 * par);
+
+  // the hour-of-light grade rides between the world and the film stock
+  if (menu) {
+    if (moodT < 1) moodT = Math.min(1, moodT + 0.034);
+    if (prevMoodCv) {
+      ctx.globalAlpha = 1 - moodT;
+      ctx.drawImage(prevMoodCv, 0, 0);
+      ctx.globalAlpha = 1;
+    }
+    if (moodCv) {
+      ctx.globalAlpha = moodT;
+      ctx.drawImage(moodCv, 0, 0);
+      ctx.globalAlpha = 1;
+    }
+    if (moodT >= 1) prevMoodCv = null;
+  }
 
   ctx.drawImage(postCv, 0, 0);
 }
