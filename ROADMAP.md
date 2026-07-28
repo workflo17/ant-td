@@ -4,6 +4,13 @@ Written after the three-review session of 2026-07-28 (critic → fix list v15 �
 pass v16 → re-review). Current honest score: **7.5/10**. Scores per axis: Difficulty 7 ·
 Balance 6 · Economy 6 · Art 9 · Readability 7.5 · Content depth 5.
 
+*Standards note: a 2026-07-18 review arc scored this game 10/10 against a
+scope-relative bar ("best feasible zero-asset solo browser TD") after the v11–v17
+feature/QA passes. This roadmap grades against the absolute genre bar (BTD6-class)
+instead — that is where the 7.5 and the milestones below come from. Same game, harder
+ruler. (The 7/28 session's commits are also labeled "v15/v16" — unrelated to the
+7/18 arc's pass names; go by date + hash.)*
+
 The gap to 10 is not more features — it is **depth of decision, bosses worth the
 letterbox, and killing the last lies**. Milestones are ordered by points-per-effort.
 Every milestone lists its acceptance test; the debug harness (`?debug`, `TD.*`, the
