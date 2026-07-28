@@ -6,6 +6,7 @@ import { TOWERS, TOWER_ORDER, SELL_RATIO } from '../data/towers.js';
 import { HEROES, HERO_ORDER, XP_LEVELS, ABILITY_UNLOCK_LEVEL } from '../data/heroes.js';
 import { Game } from './game.js';
 import { bakeMap, drawTowerIcon, drawAnt, setShakeEnabled, setReducedFlash } from './render.js';
+import { startTitleScene, stopTitleScene } from './title.js';
 import { setReducedFx } from './particles.js';
 import { HONEYPOT_STACK } from '../data/waves.js';
 import { MODES, MODE_LABEL, effDamage, isGroundOnly, recomputeStats } from './towers.js';
@@ -199,26 +200,8 @@ export function init() {
   els.btnTitleSound.addEventListener('click', () => { toggleMute(); refreshTitle(); });
   document.getElementById('btn-title-settings').addEventListener('click', showSettings);
 
-  // the front door wears the game: a real drawn ant parade under golden-hour light
-  const parade = document.getElementById('title-parade');
-  if (parade) {
-    const c = parade.getContext('2d');
-    const gr = c.createLinearGradient(0, 92, 0, 30);
-    gr.addColorStop(0, 'rgba(43,26,16,0.22)'); // long ground shade
-    gr.addColorStop(1, 'rgba(43,26,16,0)');
-    c.fillStyle = gr;
-    c.fillRect(0, 30, 400, 62);
-    const cast = [['worker', 1.15], ['trapjaw', 1.25], ['majoress', 1.4], ['weaver', 1.15]];
-    cast.forEach(([ty, scale], i) => {
-      c.save();
-      c.translate(58 + i * 96, 52 + (i % 2) * 6);
-      // stretched golden-hour shadow trailing each marcher
-      c.fillStyle = 'rgba(43,26,16,0.25)';
-      c.beginPath(); c.ellipse(-14, 14, 26, 7, -0.12, 0, Math.PI * 2); c.fill();
-      c.restore();
-      drawAnt(c, ty, TOWERS[ty], { x: 58 + i * 96, y: 52 + (i % 2) * 6, angle: 0, time: i * 1.7, bob: i * 2.3, scale });
-    });
-  }
+  // the front door is a living key-art scene now (js/title.js)
+  if (!els.screenTitle.classList.contains('hidden')) startTitleScene();
 
   // tiny build stamp (confirms a phone isn't stuck on a stale cached version)
   const tag = document.createElement('div');
@@ -263,12 +246,14 @@ function showTitle() {
   if (els.screenGame) els.screenGame.classList.add('hidden');
   if (els.screenMenu) els.screenMenu.classList.add('hidden');
   if (els.screenTitle) els.screenTitle.classList.remove('hidden');
+  startTitleScene();
   refreshTitle();
 }
 
 function showLevels() {
   if (els.screenTitle) els.screenTitle.classList.add('hidden');
   if (els.screenGame) els.screenGame.classList.add('hidden');
+  stopTitleScene();
   els.screenMenu.classList.remove('hidden');
   renderMenu();
 }
@@ -1040,6 +1025,7 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
   stopPlacing();
   hideModal();
   if (els.screenTitle) els.screenTitle.classList.add('hidden');
+  stopTitleScene();
   els.screenMenu.classList.add('hidden');
   els.screenGame.classList.remove('hidden');
   setSpeed(1);
