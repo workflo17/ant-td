@@ -1013,4 +1013,10 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .sticker, .hud-btn.pulse { transition: none; animation: none !important; }
+  /* the cinematic layer stands down as one: modal entrances/backdrop dims, foil
+     sheens, grade stamps, content staggers, and both screen-arrival cascades.
+     (Confetti and embers are skipped in JS; the scenes render a single frame.) */
+  #modal, #modal-card, #modal-card *,
+  #screen-menu.enter *, #screen-game.enter * { animation: none !important; }
+  .map-card canvas, .shop-card canvas, .pc-tier { transition: none; }
 }
