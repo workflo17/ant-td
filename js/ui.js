@@ -160,10 +160,10 @@ export function init() {
   wireCanvas();
   wireKeys();
 
-  els.btnPlay.addEventListener('click', () => {
+  els.btnPlay.addEventListener('click', (ev) => {
     unlockAudio();
     const map = MAPS.find(m => m.id === selMapId) || MAPS[0];
-    startGame(map, selDiff);
+    irisTo(() => startGame(map, selDiff), ev.clientX, ev.clientY);
   });
   if (!els.forageBtn) {
     els.forageBtn = document.createElement('button');
@@ -171,10 +171,10 @@ export function init() {
     els.forageBtn.textContent = '🌿 Foraging Run';
     els.forageBtn.title = 'Roguelite mode: start with 3 random ants, draft unlocks & relics after every round.';
     els.btnPlay.parentNode.insertBefore(els.forageBtn, els.btnPlay.nextSibling);
-    els.forageBtn.addEventListener('click', () => {
+    els.forageBtn.addEventListener('click', (ev) => {
       unlockAudio();
       const map = MAPS.find(m => m.id === selMapId) || MAPS[0];
-      startGame(map, selDiff, null, true);
+      irisTo(() => startGame(map, selDiff, null, true), ev.clientX, ev.clientY);
     });
   }
   if (!els.dailyBtn) {
@@ -192,18 +192,20 @@ export function init() {
    'btn-menu-back', 'btn-title-ach', 'btn-title-stats', 'btn-title-perks', 'btn-title-sound']
     .forEach(id => { els[id.replace(/-(\w)/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
-  els.btnTitlePlay.addEventListener('click', () => {
+  els.btnTitlePlay.addEventListener('click', (ev) => {
     unlockAudio();
-    const run = loadSave().run;
-    if (run) {
-      const map = MAPS.find(m => m.id === run.mapId);
-      if (map) { startGame(map, run.diffKey, run); return; }
-      clearRun();
-    }
-    // brand-new or quick play: jump straight into the selected map (defaults Picnic/Easy).
-    // A first-timer's tutorialDone flag is false, so the guided coach runs automatically.
-    const map = MAPS.find(m => m.id === selMapId) || MAPS[0];
-    startGame(map, selDiff);
+    irisTo(() => {
+      const run = loadSave().run;
+      if (run) {
+        const map = MAPS.find(m => m.id === run.mapId);
+        if (map) { startGame(map, run.diffKey, run); return; }
+        clearRun();
+      }
+      // brand-new or quick play: jump straight into the selected map (defaults Picnic/Easy).
+      // A first-timer's tutorialDone flag is false, so the guided coach runs automatically.
+      const map = MAPS.find(m => m.id === selMapId) || MAPS[0];
+      startGame(map, selDiff);
+    }, ev.clientX, ev.clientY);
   });
   els.btnHowto.addEventListener('click', showHowToPlay);
   els.btnLevels.addEventListener('click', showLevels);
@@ -263,6 +265,67 @@ function showTitle() {
   if (els.screenTitle) els.screenTitle.classList.remove('hidden');
   startTitleScene();
   refreshTitle();
+}
+
+// ---- iris: the ink circle that carries you onto the field and home again ----
+// Cartoon-classic wipe: a hole element whose giant box-shadow is the ink. It
+// closes on the click point, the world switches under full cover, then it
+// opens from center. Timeout fallbacks guarantee the switch even if WAAPI
+// finish events stall (hidden tabs); reduced motion skips the wipe entirely.
+let irisBusy = false;
+
+function irisTo(go, x, y) {
+  if (irisBusy || motionReduced()) { go(); return; }
+  let wrap = document.getElementById('iris');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'iris';
+    wrap.setAttribute('aria-hidden', 'true');
+    wrap.innerHTML = '<div id="iris-hole"></div>';
+    document.body.appendChild(wrap);
+  }
+  const hole = wrap.firstElementChild;
+  irisBusy = true;
+  wrap.style.display = 'block';
+  const place = (cx, cy) => {
+    const R = Math.hypot(Math.max(cx, window.innerWidth - cx), Math.max(cy, window.innerHeight - cy)) + 40;
+    hole.style.left = (cx - R) + 'px';
+    hole.style.top = (cy - R) + 'px';
+    hole.style.width = hole.style.height = (R * 2) + 'px';
+  };
+  place(x != null ? x : window.innerWidth / 2, y != null ? y : window.innerHeight / 2);
+  const close = hole.animate(
+    [{ transform: 'scale(1)' }, { transform: 'scale(0.001)' }],
+    { duration: 300, easing: 'cubic-bezier(0.5, 0, 0.75, 0.4)', fill: 'forwards' }
+  );
+  let switched = false;
+  const doSwitch = () => {
+    if (switched) return;
+    switched = true;
+    close.cancel();
+    hole.style.transform = 'scale(0.001)';
+    go();
+    place(window.innerWidth / 2, window.innerHeight / 2);
+    let opened = false;
+    const finish = () => {
+      if (opened) return;
+      opened = true;
+      hole.style.transform = '';
+      wrap.style.display = 'none';
+      irisBusy = false;
+    };
+    // timers, not rAF: rAF never fires in a hidden tab and the ink would stick
+    setTimeout(() => {
+      const open = hole.animate(
+        [{ transform: 'scale(0.001)' }, { transform: 'scale(1)' }],
+        { duration: 380, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' }
+      );
+      open.onfinish = finish;
+    }, 16);
+    setTimeout(finish, 760); // absolute failsafe: the screen may never stay covered
+  };
+  close.onfinish = doSwitch;
+  setTimeout(doSwitch, 430);
 }
 
 // re-running an entrance: the class only exists for the choreography window, so
@@ -406,7 +469,7 @@ function showDaily() {
       ${s.dailyStreak > 0 ? ` · 🔥 ${s.dailyStreak}-day rival streak` : ''}</p>
     <p class="rival-note">A local rivalry — your rival colony is spun from today's seed, right here on this device.</p>`,
     [
-      ['🐜 Start Daily', () => { hideModal(); startGame(dl.map, 'medium', null, false, dl); }],
+      ['🐜 Start Daily', () => irisTo(() => { hideModal(); startGame(dl.map, 'medium', null, false, dl); })],
       ['Close', hideModal],
     ]);
 }
@@ -830,13 +893,13 @@ export function renderMenu() {
     els.resumeBtn = document.createElement('button');
     els.resumeBtn.className = 'sticker big-btn resume-btn';
     els.btnPlay.parentNode.insertBefore(els.resumeBtn, els.btnPlay);
-    els.resumeBtn.addEventListener('click', () => {
+    els.resumeBtn.addEventListener('click', (ev) => {
       const r = loadSave().run;
       if (!r) return;
       const map = MAPS.find(m => m.id === r.mapId);
       if (!map) { clearRun(); renderMenu(); return; }
       unlockAudio();
-      startGame(map, r.diffKey, r);
+      irisTo(() => startGame(map, r.diffKey, r), ev.clientX, ev.clientY);
     });
   }
   if (run) {
@@ -1186,7 +1249,7 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
         ${scoreRowHtml(sp)}
         ${leakBreakdown(game.leakTotals) ? `<p class="modal-stats">🕳️ Leaked: ${leakBreakdown(game.leakTotals)}</p>` : ''}`,
         [
-          ['Try again', () => startGame(mapDef, diffKey)],
+          ['Try again', () => irisTo(() => startGame(mapDef, diffKey))],
           ['📊 Colony report', showStats],
           ['Back to menu', toMenu],
         ], { variant: 'lose' });
@@ -1243,7 +1306,9 @@ function spawnCoinFly(wx, wy) {
   };
 }
 
-function toMenu() {
+function toMenu() { irisTo(doToMenu); }
+
+function doToMenu() {
   checkRivalOutcome(); // leaving a daily run mid-flight still settles the rivalry
   stopPlacing();
   uiState.selected = null;
@@ -1331,7 +1396,7 @@ function togglePause() {
     showModal(`<div class="modal-title">PAUSED</div><p>The bugs wait for no ant… except now.</p>`,
       [
         ['Resume', () => { game.paused = false; hideModal(); }],
-        ['🔁 Restart run', () => { const m = game.map, d = game.diffKey; clearRun(); startGame(m, d); }],
+        ['🔁 Restart run', () => { const m = game.map, d = game.diffKey; clearRun(); irisTo(() => startGame(m, d)); }],
         ['⚙️ Settings', showSettings],
         ['Back to menu', toMenu],
       ]);

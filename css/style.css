@@ -819,6 +819,10 @@ html, body {
   to { opacity: 1; }
 }
 
+/* the iris: an ink circle that closes on your click and opens on the new screen */
+#iris { position: fixed; inset: 0; z-index: 300; display: none; pointer-events: all; }
+#iris-hole { position: absolute; border-radius: 50%; box-shadow: 0 0 0 250vmax var(--ink); will-change: transform; }
+
 /* ---------- modal cinema ----------
    Every dialog arrives the same way (Playful, ~380ms). Win and lose are the two
    big moments: a golden celebration and a dusk-ember mood. The clipped win title
