@@ -374,6 +374,10 @@ export function init() {
   // the front door is a living key-art scene now (js/title.js)
   if (!els.screenTitle.classList.contains('hidden')) startTitleScene();
 
+  // first paint blooms up from ink instead of popping into place
+  document.body.classList.add('boot');
+  setTimeout(() => document.body.classList.remove('boot'), 1000);
+
   // tiny build stamp (confirms a phone isn't stuck on a stale cached version)
   const tag = document.createElement('div');
   tag.id = 'build-tag';
@@ -1400,6 +1404,8 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
       clearRun();
       checkRivalOutcome(); // daily runs: settle the rivalry
       const sp = scoreParts(); // judged once — the reopened modal keeps its verdict
+      // the color drains from the field for a beat before the verdict arrives
+      els.screenGame.classList.add('defeat');
       lastEndModal = () => showModal(`
         <div class="modal-title lose">THE SUGAR IS GONE</div>
         <p>The bugs broke through on round ${game.round} of ${mapDef.name}.</p>
@@ -1412,7 +1418,8 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
           ['📊 Colony report', showStats],
           ['Back to menu', toMenu],
         ], { variant: 'lose' });
-      lastEndModal();
+      if (motionReduced()) lastEndModal();
+      else setTimeout(() => { if (game && game.state === 'lost') lastEndModal(); }, 750);
     },
   }, heroDef, mods);
   if (snap) game.applySnapshot(snap);
@@ -1425,7 +1432,7 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
   stopTitleScene();
   stopMenuScene();
   els.screenMenu.classList.add('hidden');
-  els.screenGame.classList.remove('hidden');
+  els.screenGame.classList.remove('hidden', 'defeat');
   playEntrance(els.screenGame, 850);
   setSpeed(1);
   game.autoStart = els.chkAuto.checked; // carry the visible toggle into the new game
@@ -1473,6 +1480,7 @@ function doToMenu() {
   uiState.selected = null;
   game = null;
   hideModal();
+  if (els.screenGame) els.screenGame.classList.remove('defeat');
   showLevels(); // land where the decisions are — Title stays the cold-start front door
 }
 
@@ -1909,7 +1917,7 @@ function updateBugCards() {
   const el = document.createElement('div');
   el.className = 'bug-card sticker';
   el.innerHTML = `
-    <div class="bc-head"><i class="bc-dot" style="background:${def.color}"></i><b>NEW BUG — ${def.name}</b></div>
+    <div class="bc-head"><i class="bc-dot${def.armored ? ' shape-armored' : def.flying ? ' shape-flying' : ''}" style="background:${def.color}"></i><b>NEW BUG — ${def.name}</b></div>
     <div class="bc-desc">${def.desc}</div>
     ${def.hint ? `<div class="bc-hint">💡 ${def.hint}</div>` : ''}`;
   document.body.appendChild(el);
@@ -2379,8 +2387,10 @@ function aggregateWave(groups) {
   for (const [key, count] of agg) {
     const [tid, camo, regen] = key.split('|');
     const def = ENEMIES[tid];
+    // shape carries meaning alongside color: square = armored, diamond = flyer
+    const shape = def.armored ? ' shape-armored' : def.flying ? ' shape-flying' : '';
     chips += `<span class="wave-chip${def.boss ? ' boss' : ''}">
-      <i style="background:${def.color}"></i>${count}× ${def.name}${def.flying ? ' 🪽' : ''}${camo === '1' ? ' 🕶️' : ''}${regen === '1' ? ' 💗' : ''}</span>`;
+      <i class="wc-dot${shape}" style="background:${def.color}"></i>${count}× ${def.name}${def.flying ? ' 🪽' : ''}${camo === '1' ? ' 🕶️' : ''}${regen === '1' ? ' 💗' : ''}</span>`;
   }
   return { chips, hasBoss, hasCamo };
 }
