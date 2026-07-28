@@ -132,6 +132,16 @@ function useful(t, e) {
   return true;
 }
 
+// the targeting-mode ranking, shared by projectile towers AND the snap/trap towers
+// (a bigger key = a better target for this mode)
+function targetKey(game, t, e) {
+  const remaining = game.pathFor(e).length - e.dist;
+  if (t.mode === 'last') return remaining;
+  if (t.mode === 'strong') return e.type.rank * 100000 - remaining;
+  if (t.mode === 'close') return -dist2(e.x, e.y, t.x, t.y);
+  return -remaining; // first
+}
+
 export function acquireTarget(game, t) {
   const s = t.stats;
   const infinite = s.range >= 9000;
@@ -146,12 +156,7 @@ export function acquireTarget(game, t) {
     if (!useful(t, e)) { sawUseless = true; continue; }
     // pure-slow weavers re-web once a slow is about to lapse (idling reads as broken)
     if (s.slowPct && effDamage(t) === 0 && e.slowUntilT - game.time > 1.2 && e.slowPct >= s.slowPct * (1 - (e.type.slowResist || 0))) continue;
-    let key;
-    const remaining = game.pathFor(e).length - e.dist;
-    if (t.mode === 'first') key = -remaining;
-    else if (t.mode === 'last') key = remaining;
-    else if (t.mode === 'strong') key = e.type.rank * 100000 - remaining;
-    else key = -dist2(e.x, e.y, t.x, t.y);
+    const key = targetKey(game, t, e);
     if (best === null || key > bestKey) { best = e; bestKey = key; }
   }
   // bugs in range it cannot touch: show the "not my job" hint instead of looking broken
@@ -184,23 +189,35 @@ function firePellet(game, t, target, kind) {
   if (kind === 'silk') sfx.silk(); else sfx.shoot();
 }
 
+const snapPool = []; // scratch list so snaps don't allocate per bite
+
 function fireSnap(game, t) {
   const s = t.stats;
   const dmg = effDamage(t);
   const r2 = s.range * s.range;
-  let hitCount = 0;
+  // collect everything in reach, then bite the BEST maxTargets by targeting mode —
+  // the 🎯 selector genuinely steers the jaws (First/Last/Strong/Close)
+  snapPool.length = 0;
   const nEnemies = game.enemies.length; // snapshot: one snap hits one wave
   for (let ei = 0; ei < nEnemies; ei++) {
     const e = game.enemies[ei];
-    if (hitCount >= s.maxTargets) break;
     if (e.dead || e.type.flying || !canSee(game, t, e)) continue; // jaws can't reach the sky
     if (dist2(e.x, e.y, t.x, t.y) > r2) continue;
+    snapPool.push(e);
+  }
+  if (snapPool.length > s.maxTargets) {
+    snapPool.sort((a, b) => targetKey(game, t, b) - targetKey(game, t, a));
+    snapPool.length = s.maxTargets;
+  }
+  let hitCount = 0;
+  for (const e of snapPool) {
     hitCount++;
     const dealt = hitEnemy(game, e, dmg, s.damageType, s);
     game.creditDamage(srcName(t), dealt);
     creditTower(game, t, dealt);
     if (s.stunChance && Math.random() < s.stunChance) applyStun(game, e, s.stunDur);
   }
+  snapPool.length = 0;
   if (hitCount > 0) {
     slashFx(t.x, t.y, s.range, '#ffd9c2');
     sfx.snap();
@@ -248,11 +265,36 @@ function computeTrapSpots(game, t) {
   for (const path of game.paths) {
     for (let d = 10; d < path.length - 10; d += 14) {
       posAt(path, d, pt, pt.seg);
-      if (dist2(pt.x, pt.y, t.x, t.y) <= r2) spots.push({ x: pt.x, y: pt.y });
+      if (dist2(pt.x, pt.y, t.x, t.y) <= r2) spots.push({ x: pt.x, y: pt.y, d });
     }
     pt.seg = 0;
   }
   return spots;
+}
+
+// the 🎯 mode steers where piles drop: First = earliest trail reach, Last = the exit
+// side, Close = hug the camp, Strong = under the biggest bug currently in the area
+function pickTrapSpot(game, t) {
+  const spots = t.trapSpots;
+  // prefer ground not already covered by one of our live piles
+  let open = spots.filter(sp => !game.traps.some(tr => !tr.dead && tr.ownerId === t.id
+    && dist2(sp.x, sp.y, tr.x, tr.y) < tr.r * tr.r));
+  if (!open.length) open = spots;
+  if (t.mode === 'first') return open.reduce((a, b) => (a.d <= b.d ? a : b));
+  if (t.mode === 'last') return open.reduce((a, b) => (a.d >= b.d ? a : b));
+  if (t.mode === 'close') return open.reduce((a, b) =>
+    (dist2(a.x, a.y, t.x, t.y) <= dist2(b.x, b.y, t.x, t.y) ? a : b));
+  // strong: drop under the highest-rank ground bug near our stretch of trail
+  let boss = null;
+  const reach = (t.stats.range + 60) ** 2;
+  for (const e of game.enemies) {
+    if (e.dead || e.type.flying) continue;
+    if (dist2(e.x, e.y, t.x, t.y) > reach) continue;
+    if (!boss || e.type.rank > boss.type.rank) boss = e;
+  }
+  if (boss) return open.reduce((a, b) =>
+    (dist2(a.x, a.y, boss.x, boss.y) <= dist2(b.x, b.y, boss.x, boss.y) ? a : b));
+  return open[(Math.random() * open.length) | 0];
 }
 
 function fireTrap(game, t) {
@@ -262,7 +304,7 @@ function fireTrap(game, t) {
   let mine = 0;
   for (const tr of game.traps) if (!tr.dead && tr.ownerId === t.id) mine++;
   if (mine >= s.maxPiles) { t.cooldownT = 0.2; return; }
-  const spot = t.trapSpots[(Math.random() * t.trapSpots.length) | 0];
+  const spot = pickTrapSpot(game, t);
   game.traps.push({
     x: spot.x + (Math.random() - 0.5) * 10,
     y: spot.y + (Math.random() - 0.5) * 10,

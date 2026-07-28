@@ -23,7 +23,14 @@ a bot campaign before it ships.
 
 ---
 
-## M1 — Kill the last lies (Readability 7.5 → 8.5) — ~1 session
+## M1 — Kill the last lies (Readability 7.5 → 8.5) — ✅ SHIPPED 2026-07-28
+
+All five items landed and verified, plus a bonus: the wave preview now applies
+`hardAdjust` so Hard's preview matches Hard's spawns. Acceptance results: Strong-mode
+snap bit the snail and spared exactly the two worst mites of eight candidates;
+First/Last piles landed at x411/x584 around a camp at x500; boss bar reads
+"320/320 · ☠ −341🍞" in lethal red; the camo chip appears with no detection and
+clears with Keen Scent; settings persist and boot-apply. Original scope follows.
 
 The cheapest points on the board. Nothing new; everything stops lying.
 

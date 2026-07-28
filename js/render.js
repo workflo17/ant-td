@@ -5,6 +5,7 @@ import { drawParticles } from './particles.js';
 import { INK, mixHex, bodyGrad, rr } from './render/helpers.js';
 import { bodyColors, drawBugBody, drawSnailShell, drawStatusFx, drawHpBar } from './render/bugs.js';
 import { drawAnt, drawTowerIcon } from './render/ants.js';
+import { rbe } from './enemies.js'; // circular with enemies.js↔render.js — runtime-safe (used inside draw only)
 
 
 let canvas = null, ctx = null;
@@ -57,6 +58,12 @@ export function initRender(cv) {
 
 
 let freshDecals = []; // recent scorches still radiating heat (shimmer squiggles)
+
+// accessibility settings (wired from the ⚙️ Settings modal via ui.js)
+let shakeEnabled = true;
+let reducedFlash = false;
+export function setShakeEnabled(v) { shakeEnabled = !!v; }
+export function setReducedFlash(v) { reducedFlash = !!v; }
 
 // battlefield scars: stamped by explosions, slowly fade out
 export function addDecal(x, y, scale = 1) {
@@ -997,9 +1004,10 @@ export function drawEnemy(game, e, time) {
     ctx.restore();
   }
   // charge telegraph: gold warning tint pulses over the trembling shell
+  // (steady tint in reduced-flash mode — the tremble carries the warning)
   if (chargeTele) {
     ctx.save();
-    ctx.globalAlpha = 0.28 + 0.18 * Math.sin(time * 30);
+    ctx.globalAlpha = reducedFlash ? 0.32 : 0.28 + 0.18 * Math.sin(time * 30);
     ctx.fillStyle = '#ffd166';
     ctx.beginPath();
     ctx.ellipse(0, 0, t.radius * 1.25 + 2, t.radius * 0.92 + 2, 0, 0, TAU);
@@ -1012,7 +1020,7 @@ export function drawEnemy(game, e, time) {
   // rage shield: golden ring while the queen is damage-immune
   if (e.shieldT > 0) {
     const k = Math.min(1, e.shieldT / 1.5);
-    ctx.strokeStyle = `rgba(255,209,102,${0.45 + 0.4 * Math.sin(time * 14)})`;
+    ctx.strokeStyle = `rgba(255,209,102,${reducedFlash ? 0.65 : 0.45 + 0.4 * Math.sin(time * 14)})`;
     ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(0, 0, t.radius + 8 + Math.sin(time * 9) * 2, 0, TAU); ctx.stroke();
     ctx.strokeStyle = `rgba(255,255,255,${0.35 * k})`;
@@ -1370,7 +1378,7 @@ export function draw(game, ui, time) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); // world units on a retina backing store
   ctx.clearRect(0, 0, WORLD_W, WORLD_H);
   ctx.save();
-  if (game && game.shake > 0) {
+  if (game && game.shake > 0 && shakeEnabled) {
     ctx.translate((Math.random() - 0.5) * game.shake * 14, (Math.random() - 0.5) * game.shake * 14);
   }
   if (game) ctx.translate(game.kickX || 0, game.kickY || 0);
@@ -1856,9 +1864,9 @@ function drawBossBars(game, time) {
     ctx.fillStyle = 'rgba(30,16,8,0.78)';
     rr(ctx, -W / 2 - 8, -6, W + 16, H + 24, 9);
     ctx.fill();
-    // gold border, pulsing while raging
+    // gold border, pulsing while raging (steady in reduced-flash mode)
     ctx.strokeStyle = raging
-      ? `rgba(255,209,102,${0.7 + 0.3 * Math.sin(time * 18)})`
+      ? (reducedFlash ? 'rgba(255,209,102,1)' : `rgba(255,209,102,${0.7 + 0.3 * Math.sin(time * 18)})`)
       : 'rgba(255,209,102,0.9)';
     ctx.lineWidth = raging ? 3.5 : 2.5;
     rr(ctx, -W / 2 - 8, -6, W + 16, H + 24, 9);
@@ -1868,11 +1876,14 @@ function drawBossBars(game, time) {
     ctx.font = "900 13px 'Baloo 2', 'Trebuchet MS', sans-serif";
     ctx.fillStyle = raging ? '#ffd166' : '#fff3d6';
     ctx.fillText(e.type.name.toUpperCase() + (raging ? ' — RAGING' : ''), -W / 2, 6);
-    // hp readout
+    // hp readout + what a leak would cost — red when that would end the run
+    const leak = Math.ceil(e.hp + rbe(e.typeId) - e.type.hp);
+    const lethal = leak >= game.crumbs;
     ctx.textAlign = 'right';
     ctx.font = "800 12px 'Baloo 2', 'Trebuchet MS', sans-serif";
-    ctx.fillStyle = '#ffe9a8';
-    ctx.fillText(`${Math.ceil(e.hp)} / ${e.maxHp}` + (i === 1 && extra > 0 ? `  (+${extra} more)` : ''), W / 2, 6);
+    ctx.fillStyle = lethal ? '#ff5d4f' : '#ffe9a8';
+    ctx.fillText(`${Math.ceil(e.hp)} / ${e.maxHp} · ${lethal ? '☠ ' : ''}−${leak}🍞`
+      + (i === 1 && extra > 0 ? `  (+${extra} more)` : ''), W / 2, 6);
     // trough
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     rr(ctx, -W / 2, 10, W, H - 6, 5);
@@ -1880,7 +1891,7 @@ function drawBossBars(game, time) {
     // fill: gold flash while shielded, blood-to-amber gradient otherwise
     if (frac > 0.004) {
       ctx.fillStyle = raging
-        ? (Math.sin(time * 18) > 0 ? '#ffd166' : '#fff3d6')
+        ? (reducedFlash ? '#ffd166' : (Math.sin(time * 18) > 0 ? '#ffd166' : '#fff3d6'))
         : frac > 0.5 ? '#e2472f' : frac > 0.25 ? '#f2913a' : '#ffd166';
       rr(ctx, -W / 2, 10, W * frac, H - 6, 5);
       ctx.fill();

@@ -1,11 +1,13 @@
 // ===== DOM overlay: menu, HUD, shop, tower panel, modals, input =====
 import { MAPS, WORLD_W, WORLD_H } from '../data/maps.js';
-import { WAVES, freeplayRound, easyAdjust } from '../data/waves.js';
+import { WAVES, freeplayRound, easyAdjust, hardAdjust } from '../data/waves.js';
 import { ENEMIES } from '../data/enemies.js';
 import { TOWERS, TOWER_ORDER, SELL_RATIO } from '../data/towers.js';
 import { HEROES, HERO_ORDER, XP_LEVELS, ABILITY_UNLOCK_LEVEL } from '../data/heroes.js';
 import { Game } from './game.js';
-import { bakeMap, drawTowerIcon, drawAnt } from './render.js';
+import { bakeMap, drawTowerIcon, drawAnt, setShakeEnabled, setReducedFlash } from './render.js';
+import { setReducedFx } from './particles.js';
+import { HONEYPOT_STACK } from '../data/waves.js';
 import { MODES, MODE_LABEL, effDamage, isGroundOnly, recomputeStats } from './towers.js';
 
 const TYPE_CHIP = {
@@ -22,9 +24,20 @@ function statBarHtml(label, val, max, text) {
 function towerStatsHtml(t) {
   const s = t.stats;
   if (!s.attack) {
-    return s.income != null
-      ? statBarHtml('Income', s.income, 500, `${s.income}/round`) + (s.interest ? statBarHtml('Interest', s.interest, 0.25, `${Math.round(s.interest * 100)}%`) : '')
-      : statBarHtml('Aura', s.range, 260, `${Math.round(s.range)}`) + statBarHtml('Haste', s.auraRate || 1, 1.4, `+${Math.round(((s.auraRate || 1) - 1) * 100)}%`);
+    if (s.income != null) {
+      // show what THIS pot actually pays: extra pots stack at ×0.7 each (endRound order)
+      const potIdx = game ? game.towers.filter(x => x.stats.income).indexOf(t) : 0;
+      const eff = Math.round(s.income * Math.pow(HONEYPOT_STACK, Math.max(0, potIdx))
+        * (game ? game.incomeMul * game.honeyMul : 1));
+      let html = statBarHtml('Income', eff, 500, `${eff}/round`);
+      if (potIdx > 0) {
+        const ord = ['ˢᵗ', 'ⁿᵈ', 'ʳᵈ'][potIdx] || 'ᵗʰ';
+        html += `<p class="pc-record">${potIdx + 1}${ord} pot: ×${HONEYPOT_STACK} each — pays ${eff}, not ${Math.round(s.income)}</p>`;
+      }
+      if (s.interest) html += statBarHtml('Interest', s.interest, 0.25, `${Math.round(s.interest * 100)}%`);
+      return html;
+    }
+    return statBarHtml('Aura', s.range, 260, `${Math.round(s.range)}`) + statBarHtml('Haste', s.auraRate || 1, 1.4, `+${Math.round(((s.auraRate || 1) - 1) * 100)}%`);
   }
   const dmg = effDamage(t);
   const shots = s.multishot || 1;
@@ -106,6 +119,9 @@ export function init() {
   setMusicMuted(save.musicMuted);
   setSfxVolume(save.sfxVol ?? 0.7);
   setMusicVolume(save.musicVol ?? 0.5);
+  setShakeEnabled(save.shakeOn ?? true);
+  setReducedFlash(!(save.flashOn ?? true));
+  setReducedFx(!(save.flashOn ?? true));
   if (save.hero && HEROES[save.hero]) selHero = save.hero;
 
   buildHud();
@@ -165,6 +181,7 @@ export function init() {
   els.btnTitleStats.addEventListener('click', showLifetimeStats);
   els.btnTitlePerks.addEventListener('click', showPerks);
   els.btnTitleSound.addEventListener('click', () => { toggleMute(); refreshTitle(); });
+  document.getElementById('btn-title-settings').addEventListener('click', showSettings);
 
   // tiny build stamp (confirms a phone isn't stuck on a stale cached version)
   const tag = document.createElement('div');
@@ -1085,7 +1102,10 @@ function showSettings() {
   showModal(`
     <div class="modal-title">⚙️ SETTINGS</div>
     <div class="set-row"><span>🔊 Effects</span><input id="set-sfx" type="range" min="0" max="100" value="${Math.round((s.sfxVol ?? 0.7) * 100)}"></div>
-    <div class="set-row"><span>🎵 Music</span><input id="set-music" type="range" min="0" max="100" value="${Math.round((s.musicVol ?? 0.5) * 100)}"></div>`,
+    <div class="set-row"><span>🎵 Music</span><input id="set-music" type="range" min="0" max="100" value="${Math.round((s.musicVol ?? 0.5) * 100)}"></div>
+    <div class="set-row"><span>📳 Screen shake</span><label class="set-toggle"><input id="set-shake" type="checkbox" ${s.shakeOn ?? true ? 'checked' : ''}> on</label></div>
+    <div class="set-row"><span>⚡ Bright flashes</span><label class="set-toggle"><input id="set-flash" type="checkbox" ${s.flashOn ?? true ? 'checked' : ''}> on</label></div>
+    <p class="set-note">Turn flashes off for a steadier, strobe-free picture.</p>`,
     [['Done', () => { if (game && game.paused) togglePause(); else hideModal(); }]]);
   document.getElementById('set-sfx').addEventListener('input', (e) => {
     const v = e.target.value / 100;
@@ -1097,6 +1117,17 @@ function showSettings() {
     const v = e.target.value / 100;
     setMusicVolume(v);
     const sv = loadSave(); sv.musicVol = v; persist();
+  });
+  document.getElementById('set-shake').addEventListener('change', (e) => {
+    const on = e.target.checked;
+    setShakeEnabled(on);
+    const sv = loadSave(); sv.shakeOn = on; persist();
+  });
+  document.getElementById('set-flash').addEventListener('change', (e) => {
+    const on = e.target.checked;
+    setReducedFlash(!on);
+    setReducedFx(!on);
+    const sv = loadSave(); sv.flashOn = on; persist();
   });
 }
 
@@ -1788,12 +1819,19 @@ function wireKeys() {
 function wavePreviewRound(n) {
   let groups = n <= WAVES.length ? WAVES[n - 1] : freeplayRound(n);
   if (game.diffKey === 'easy') groups = easyAdjust(groups, n);
+  else if (game.diffKey === 'hard') groups = hardAdjust(groups, n); // preview must match what spawns
+  return aggregateWave(groups);
+}
+
+function aggregateWave(groups) {
   const agg = new Map();
   let hasBoss = false;
+  let hasCamo = !!(game && game.mods.camo); // Camo Chaos: everything is camo
   for (const gr of groups) {
     const key = `${gr.t}|${gr.camo ? 1 : 0}|${gr.regen ? 1 : 0}`;
     agg.set(key, (agg.get(key) || 0) + gr.n);
     if (ENEMIES[gr.t].boss) hasBoss = true;
+    if (gr.camo) hasCamo = true;
   }
   let chips = '';
   for (const [key, count] of agg) {
@@ -1802,7 +1840,13 @@ function wavePreviewRound(n) {
     chips += `<span class="wave-chip${def.boss ? ' boss' : ''}">
       <i style="background:${def.color}"></i>${count}× ${def.name}${def.flying ? ' 🪽' : ''}${camo === '1' ? ' 🕶️' : ''}${regen === '1' ? ' 💗' : ''}</span>`;
   }
-  return { chips, hasBoss };
+  return { chips, hasBoss, hasCamo };
+}
+
+// can anything the player has placed see a camo bug right now?
+function boardSeesCamo() {
+  return game.globalDetect || game.shroudT > 0
+    || game.towers.some(t => t.stats.camoDetect || t.buffDetect);
 }
 
 // upcoming wave summary for the idle panel (Scout's Eye ⭐9: two-round lookahead)
@@ -1813,6 +1857,10 @@ function buildWavePreview() {
   let html = `<div class="wave-preview${cur.hasBoss ? ' danger' : ''}">
     <div class="wp-title">${cur.hasBoss ? '⚠️ ROUND ' + n + ' — BOSS INCOMING' : 'NEXT: ROUND ' + n}</div>
     <div class="wp-chips">${cur.chips}</div>`;
+  if (cur.hasCamo && !boardSeesCamo()) {
+    html += `<div class="wave-warn">🕶️ Camo incoming — nothing you've placed can see it!
+      <span class="wave-warn-hint">Pheromone Beacon's Keen Scent reveals camo.</span></div>`;
+  }
   if (game.starRewards && game.starRewards.scoutseye) {
     const next = wavePreviewRound(n + 1);
     html += `<div class="wp-title wp-after">${next.hasBoss ? '🔭 THEN: ROUND ' + (n + 1) + ' — ⚠️ BOSS' : '🔭 THEN: ROUND ' + (n + 1)}</div>

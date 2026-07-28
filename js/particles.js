@@ -6,6 +6,10 @@ const pool = [];
 for (let i = 0; i < MAX; i++) pool.push({ active: false });
 let cursor = 0;
 
+// reduced-flash accessibility setting: strobing white flashes draw far dimmer
+let reducedFx = false;
+export function setReducedFx(v) { reducedFx = !!v; }
+
 function take() {
   for (let i = 0; i < MAX; i++) {
     cursor = (cursor + 1) % MAX;
@@ -178,7 +182,7 @@ export function drawParticles(ctx) {
     if (!p.active) continue;
     const k = 1 - p.age / p.life;
     if (p.kind === 'flash') {
-      ctx.globalAlpha = k * 0.9;
+      ctx.globalAlpha = k * (reducedFx ? 0.3 : 0.9);
       ctx.fillStyle = '#fff';
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r * (1 + (1 - k) * 0.5), 0, TAU);
