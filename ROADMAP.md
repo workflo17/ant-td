@@ -51,7 +51,14 @@ The cheapest points on the board. Nothing new; everything stops lying.
 **Accept:** trap-jaw on Strong measurably prioritizes snails over mites (TD.hit log);
 a no-detection board gets the chip on r7; both volume sliders audibly work (owner ears).
 
-## M2 — Every tower a protagonist (Balance 6 → 8) — 1–2 sessions
+## M2 — Every tower a protagonist — ✅ SHIPPED 2026-07-28
+
+Ledger acceptance on the front-lined reference build (Medium r40 win): exploders 22%
+each (with scorched ground tuned down from a 32% first pass), Majoress 17%, Army 12%
+(ambush dump), workers 10%, archer 8%, hero 5% (XP diet). Trap-Jaw buffed (cd 1.0,
+Snap Storm +2) but stays a utility pick below 5% — its stuns don't show in a damage
+ledger. Key finding: kill-topology starves back-line AoE; the reference build must
+front-line traps and bombs. Original scope follows.
 
 Reference test: scripted Medium campaign ledger. Target: **no tower above 22%, none
 below 5%, hero ≤ 15%.** (Today: hero 25%, Army ~0%, Exploder 4%.)
@@ -72,7 +79,14 @@ below 5%, hero ≤ 15%.** (Today: hero 25%, Army ~0%, Exploder 4%.)
 **Accept:** ledger spread within targets on Medium AND Hard bot runs; Army ≥ 6%;
 no regression past r24 Hard prepared-build survival.
 
-## M3 — Bosses worth the letterbox (Difficulty 7 → 9) — 1–2 sessions
+## M3 — Bosses worth the letterbox — ✅ SHIPPED 2026-07-28
+
+Boss leaks wound (half crumbs, min 30; Steel keeps full RBE). Cat sheds at 75/50/25%
+(death burst 4→2), Queen raises wasp escorts every 12s, stag tosses the nearest guard
+once under half. Overtime mods live: ARMORED/BROOD/STAMPEDE/THE HERD/NIGHT FALLS/
+MIDNIGHT COURT — night keeps the map's own ground under indigo + lamp pools, dawn
+restores. Freeplay rotates on an epoch-week seed. Hard acceptance: same build survives
+r24 at 79 and r30 at 46 crumbs — bleeding, never executed. Original scope follows.
 
 1. **Boss leaks wound, they don't execute** — a leaking boss costs
    `min(RBE, max(30, ceil(crumbs × 0.5)))`. Losing to the same boss **twice** is death;
@@ -96,7 +110,14 @@ no regression past r24 Hard prepared-build survival.
 binary); boss-leak death requires two boss leaks; "NIGHT FALLS" renders day-map night
 correctly (shot test).
 
-## M4 — Decisions per run (Content depth 5 → 8) — 2–3 sessions
+## M4 — Decisions per run — ✅ SHIPPED 2026-07-28 (gauntlets deferred)
+
+Relic shelf: 12 steady + 5 build-arounds (Sugar-Free ×3-pops verified, Monoculture,
+Glass, Nocturne permanent night +10% rate — adapted from the lamp-pool idea, Dowry
+half-ascensions + sealed roster verified at r25). Camo Chaos halves Beacons; new chips
+Broodmother and Closing Time. Twists: picnic jam drip (seeded per round, slows 0.65),
+garden pond mist (10s camo sight near water). Gauntlets remain the stretch item.
+Original scope follows.
 
 The 10 lives here. Wide-but-thin becomes build identity.
 
@@ -132,7 +153,13 @@ The 10 lives here. Wide-but-thin becomes build identity.
    Board*, *Perfect Stag* (r24 Hard, zero leaks), *Sugar-Free 40* (relic win).
 4. **Save-string export/import** on the stats page (protect 60-round runs).
 
-## M6 — Ship-quality gates (the last half point) — ongoing
+## M6 — Ship-quality gates — ◐ PARTIAL 2026-07-28
+
+Done: PLAYTEST.md (the owner hardware hour — ears at 1×, phone hands, grayscale eyes);
+reduced-flash + shake toggles shipped in M1; colorblind shape-cue audit passed by
+construction (camo stripes+dash, burn flames, slow webs, stun stars). Remaining and
+OWNER-GATED: run PLAYTEST.md on real hardware; sprite-atlas perf work only if the
+phone dips; combat GIFs from live play; the itch.io page. Original scope follows.
 
 1. **Owner hardware hour** (the two things a bot cannot judge): a phone touch session
    and an audio listen at 1× on rounds 1–24 Hard. Checklist: does the stag telegraph

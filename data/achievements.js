@@ -16,4 +16,9 @@ export const ACHIEVEMENTS = [
   { id: 'stormcaller', icon: '☄️', name: 'Stormcaller', desc: 'Cast 15 colony powers in one game' },
   { id: 'backyardLegend', icon: '🌾', name: 'Backyard Legend', desc: 'Earn all 18 backyard stars' },
   { id: 'nemesis', icon: '😤', name: 'Nemesis', desc: 'Defeat the same rival colony 3 days running' },
+  // skill-gated (the ones a single lucky win can't hand you)
+  { id: 'noArcher', icon: '🚫', name: 'Bare Knuckle', desc: 'Win without ever placing an Acid Archer' },
+  { id: 'fiveAnts', icon: '🖐️', name: 'Five-Ant Board', desc: 'Win having placed 5 or fewer ants all game' },
+  { id: 'perfectStag', icon: '🦌', name: 'Perfect Stag', desc: 'Reach round 24 on Hard without leaking once' },
+  { id: 'sugarfree40', icon: '🚫', name: 'Sugar-Free Victory', desc: 'Win a Foraging Run holding Sugar-Free Colony' },
 ];

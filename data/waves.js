@@ -156,7 +156,10 @@ export const DECOY = {
 };
 
 export const DIFFICULTY = {
-  easy:   { name: 'Easy',   costMul: 0.85, speedMul: 0.92, hpMul: 1 },
-  medium: { name: 'Medium', costMul: 1.0,  speedMul: 1.0,  hpMul: 1 },
-  hard:   { name: 'Hard',   costMul: 1.1,  speedMul: 1.08, hpMul: 1.25 },
+  easy:   { name: 'Easy',   costMul: 0.85, speedMul: 0.92, hpMul: 1,    scoreMul: 1 },
+  medium: { name: 'Medium', costMul: 1.0,  speedMul: 1.0,  hpMul: 1,    scoreMul: 1.5 },
+  hard:   { name: 'Hard',   costMul: 1.1,  speedMul: 1.08, hpMul: 1.25, scoreMul: 2 },
 };
+
+// run-score grades (score = (pops + round*120) * scoreMul * challenge bonus)
+export const SCORE_GRADES = [[60000, '👑'], [45000, 'S'], [30000, 'A'], [15000, 'B'], [0, 'C']];

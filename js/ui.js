@@ -1,6 +1,6 @@
 // ===== DOM overlay: menu, HUD, shop, tower panel, modals, input =====
 import { MAPS, WORLD_W, WORLD_H } from '../data/maps.js';
-import { WAVES, freeplayRound, easyAdjust, hardAdjust } from '../data/waves.js';
+import { WAVES, freeplayRound, easyAdjust, hardAdjust, SCORE_GRADES } from '../data/waves.js';
 import { ENEMIES } from '../data/enemies.js';
 import { TOWERS, TOWER_ORDER, SELL_RATIO } from '../data/towers.js';
 import { HEROES, HERO_ORDER, XP_LEVELS, ABILITY_UNLOCK_LEVEL } from '../data/heroes.js';
@@ -91,6 +91,20 @@ const MOD_DEFS = [
   { id: 'closing', icon: '⏰', name: 'Closing Time', desc: 'Bugs sprint +60% on the final third of the trail.' },
 ];
 let lastEndModal = null;
+
+// run score + grade; records the per-map:difficulty best as a side effect
+function scoreLine() {
+  if (!game) return '';
+  const score = game.runScore();
+  const grade = SCORE_GRADES.find(([at]) => score >= at)[1];
+  const s = loadSave();
+  s.bestScore = s.bestScore || {};
+  const k = `${game.map.id}:${game.diffKey}`;
+  const prev = s.bestScore[k] || 0;
+  const isBest = score > prev;
+  if (isBest) { s.bestScore[k] = score; persist(); }
+  return `🏆 Score ${fmt(score)} · grade ${grade}${isBest ? ' · NEW BEST!' : ` · best ${fmt(prev)}`}`;
+}
 const els = {};
 let shopCards = [];   // { el, typeId }
 let panelDyn = [];    // dynamic-affordability upgrade buttons: { el, calc() }
@@ -473,6 +487,12 @@ function applyHourTint(c, W, H, map) {
   c.fillRect(0, 0, W, H);
 }
 
+// storm rank: freeplay checkpoints survived (r50 ⛈ · r60 🌩 · r70 ⚡)
+function stormBadge(mapId) {
+  const r = (loadSave().stormRank || {})[mapId] || 0;
+  return r >= 70 ? ' ⚡' : r >= 60 ? ' 🌩' : r >= 50 ? ' ⛈' : '';
+}
+
 // one star per difficulty beaten (easy/medium/hard win) — read straight off save.wins
 function starsForMap(mapId) {
   const s = loadSave();
@@ -570,7 +590,7 @@ function renderTrail() {
       ${locked ? '<span class="tn-lock">🔒</span>' : ''}
       <span class="tn-stars">${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}</span>
       <span class="tn-name">${map.name}</span>
-      <span class="tn-best">${locked ? map.unlock.label : best > 0 ? `best r${best}` : 'unexplored'}</span>`;
+      <span class="tn-best">${locked ? map.unlock.label : best > 0 ? `best r${best}${stormBadge(map.id)}` : 'unexplored'}</span>`;
     drawTrailEmblem(node.querySelector('canvas'), map, locked);
     if (!locked) node.addEventListener('click', () => { selMapId = map.id; renderMenu(); });
     els.trail.appendChild(node);
@@ -912,6 +932,16 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
       loadSave().totalRounds++; // persisted by bankPops right below
       bankPops(game.stats.pops - game.popsBanked);
       game.popsBanked = game.stats.pops;
+      // storm ranks: freeplay checkpoints at r50/60/70 earn a permanent badge
+      if (game.freeplay && (round === 50 || round === 60 || round === 70)) {
+        const sv = loadSave();
+        sv.stormRank = sv.stormRank || {};
+        if ((sv.stormRank[mapDef.id] || 0) < round) {
+          sv.stormRank[mapDef.id] = round;
+          persist();
+          toast('⛈ STORM RANK', `Survived to round ${round} in freeplay on ${mapDef.name}!`);
+        }
+      }
       checkAchievements(false);
       saveRun();
       if (game.mods.forage && game.state === 'idle') showDraft();
@@ -934,7 +964,8 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
       lastEndModal = () => showModal(`
         <div class="modal-title win">STASH DEFENDED!</div>
         <p>The Hornet Queen is popped. 40 rounds survived on ${mapDef.name} (${DIFF_LABEL[diffKey]}).</p>
-        <p class="modal-stats">${medalStr} medal · 🎈 ${fmt(game.stats.pops)} layers popped · 🍞 ${game.crumbs} crumbs left</p>`,
+        <p class="modal-stats">${medalStr} medal · 🎈 ${fmt(game.stats.pops)} layers popped · 🍞 ${game.crumbs} crumbs left</p>
+        <p class="modal-stats">${scoreLine()}</p>`,
         [
           ['Keep going — freeplay!', () => { game.continueFreeplay(); hideModal(); }],
           ['📊 Colony report', showStats],
@@ -949,6 +980,7 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
         <div class="modal-title lose">THE SUGAR IS GONE</div>
         <p>The bugs broke through on round ${game.round} of ${mapDef.name}.</p>
         <p class="modal-stats">🎈 ${fmt(game.stats.pops)} layers popped before the fall</p>
+        <p class="modal-stats">${scoreLine()}</p>
         ${leakBreakdown(game.leakTotals) ? `<p class="modal-stats">🕳️ Leaked: ${leakBreakdown(game.leakTotals)}</p>` : ''}`,
         [
           ['Try again', () => startGame(mapDef, diffKey)],
@@ -1472,6 +1504,10 @@ function checkAchievements(won) {
     forager: won && game.mods.forage,
     stormcaller: (game.powersCast || 0) >= 15,
     backyardLegend: backyardStars() >= 18, // all map×difficulty wins
+    noArcher: won && !game.typesPlaced.has('archer'),
+    fiveAnts: won && game.towersPlacedCount <= 5,
+    perfectStag: game.diffKey === 'hard' && game.round >= 24 && game.stats.leaks === 0,
+    sugarfree40: won && !!game.relics.sugarfree,
   };
   for (const a of ACHIEVEMENTS) {
     if (!s.ach[a.id] && tests[a.id]) {
@@ -1527,7 +1563,50 @@ function showLifetimeStats() {
     <p class="modal-stats">🎈 ${fmt(s.totalPops)} layers popped lifetime ·
       🏆 ${achGot}/${ACHIEVEMENTS.length} achievements (${achPct}%) · 🍯 ${jellyEarned()} royal jelly earned</p>
     <div class="ach-list">${mapRows}</div>`,
-    [['Close', hideModal]]);
+    [
+      ['📤 Export save', showExportSave],
+      ['📥 Import save', showImportSave],
+      ['Close', hideModal],
+    ]);
+}
+
+// ---- save export/import: protect 60-round campaigns from a cleared cache ----
+function showExportSave() {
+  const code = btoa(unescape(encodeURIComponent(localStorage.getItem('grubsTD.v1') || '{}')));
+  showModal(`
+    <div class="modal-title">📤 EXPORT SAVE</div>
+    <p>Copy this code somewhere safe. Paste it into Import on any device.</p>
+    <textarea class="save-code" readonly>${code}</textarea>`,
+    [
+      ['📋 Copy', () => {
+        const ta = document.querySelector('.save-code');
+        ta.select();
+        try { navigator.clipboard.writeText(ta.value); toast('📋 Copied', 'Save code is on the clipboard.'); } catch { /* select() leaves it ready for manual copy */ }
+      }],
+      ['Close', hideModal],
+    ]);
+}
+
+function showImportSave() {
+  showModal(`
+    <div class="modal-title">📥 IMPORT SAVE</div>
+    <p>Paste a save code below. <b>This replaces the save on this device.</b></p>
+    <textarea class="save-code" placeholder="paste your save code here"></textarea>`,
+    [
+      ['Import & reload', () => {
+        const ta = document.querySelector('.save-code');
+        try {
+          const json = decodeURIComponent(escape(atob(ta.value.trim())));
+          const data = JSON.parse(json);
+          if (!data || typeof data !== 'object' || !('best' in data)) throw new Error('not a Grubs TD save');
+          localStorage.setItem('grubsTD.v1', json);
+          location.reload();
+        } catch (e) {
+          toast('❌ Bad save code', 'That code did not parse as a Grubs TD save.');
+        }
+      }],
+      ['Cancel', hideModal],
+    ]);
 }
 
 function showAchievements() {

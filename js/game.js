@@ -762,6 +762,13 @@ export class Game {
     }
   }
 
+  // ---- run score: pops + progress, scaled by difficulty and active challenges ----
+  runScore() {
+    const modCount = ['steel', 'camo', 'speed', 'poverty', 'brood', 'closing']
+      .filter(k => this.mods[k]).length;
+    return Math.round((this.stats.pops + this.round * 120) * (this.diff.scoreMul || 1) * (1 + 0.25 * modCount));
+  }
+
   // ---- ascension: fuse a maxed tower into its paragon form; repeatable, escalating ----
   ascendCost() {
     return Math.round(ASCEND_COST * Math.pow(ASCEND_GROWTH, this.ascensions) * this.diff.costMul * (this.ascendMul || 1));

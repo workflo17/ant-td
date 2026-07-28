@@ -480,6 +480,7 @@ html, body {
 .set-toggle { display: flex; align-items: center; gap: 6px; font-weight: 700; }
 .set-toggle input { width: 20px; height: 20px; accent-color: var(--honey); }
 .set-note { font-size: 11px; opacity: 0.75; margin: 2px 0 0; }
+.save-code { width: 100%; min-height: 90px; font: 11px/1.4 monospace; border: 2px solid var(--ink); border-radius: 8px; padding: 8px; background: var(--cream); word-break: break-all; resize: vertical; }
 
 #mod-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
 .mod-chip { padding: 5px 12px; font-size: 12px; border-radius: 10px; background: #e8dfca; }
