@@ -712,7 +712,7 @@ html, body {
 /* paper tooth on the big sticker surfaces (variants above use background-color,
    so the texture survives selection/hover states) */
 .map-card, .trail-node, .hero-card, .draft-card, #modal-card, .panel-card,
-.ach-toast, .bug-card, #coach, #coach-camo, #coach-decoy {
+.shop-card, .ach-toast, .bug-card, #coach, #coach-camo, #coach-decoy {
   background-image: var(--tex-paper);
   background-size: 9px 9px, 13px 13px, 100% 100%;
   background-position: 0 0, 4px 6px, 0 0;
@@ -754,6 +754,62 @@ html, body {
 }
 @keyframes dock-rise {
   from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; }
+}
+
+/* ---------- in-game chrome: the HUD is furniture, the shop is a card tray ---------- */
+
+/* the HUD bar reads as actual wood: grain, a lit top edge, weight underneath */
+#hud {
+  background:
+    linear-gradient(rgba(255, 235, 200, 0.08), rgba(43, 26, 16, 0.14)),
+    repeating-linear-gradient(94deg,
+      rgba(43, 26, 16, 0.09) 0 2px, transparent 2px 11px,
+      rgba(255, 230, 190, 0.05) 11px 13px, transparent 13px 26px),
+    var(--wood);
+  box-shadow: 4px 4px 0 rgba(43, 26, 16, 0.85), 0 10px 24px rgba(20, 12, 4, 0.32),
+    inset 0 1.5px 0 rgba(255, 240, 210, 0.25);
+}
+/* chips get a pressed-tin bevel */
+.hud-chip {
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.7), inset 0 -2px 0 rgba(43, 26, 16, 0.08),
+    2px 2px 0 rgba(43, 26, 16, 0.5);
+}
+
+/* shop cards sit in a tray; the armed one lifts and wears the honey ring */
+.shop-card {
+  box-shadow: 3px 3px 0 rgba(43, 26, 16, 0.85), 0 8px 16px rgba(20, 12, 4, 0.22);
+}
+.shop-card canvas { transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.shop-card:hover:not(:disabled) canvas { transform: scale(1.12) rotate(-3deg); }
+.shop-card.placing {
+  background-color: #ffe9a8;
+  transform: translate(-1px, -2px);
+  box-shadow: 0 0 0 3px var(--honey), 3px 3px 0 rgba(43, 26, 16, 0.85), 0 10px 20px rgba(20, 12, 4, 0.3);
+}
+.shop-card.placing:hover { transform: translate(-1px, -2px); }
+
+/* tower panel: owned tiers read stamped-in, buyable tiers sit proud */
+.panel-card { box-shadow: 4px 4px 0 rgba(43, 26, 16, 0.85), 0 10px 22px rgba(20, 12, 4, 0.25); }
+.pc-tier { box-shadow: 2px 2px 0 rgba(43, 26, 16, 0.55); transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease; }
+.pc-tier.owned { box-shadow: inset 0 2px 3px rgba(43, 26, 16, 0.18), inset 0 0 0 1.5px rgba(63, 122, 34, 0.3); }
+.pc-tier.buyable:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 rgba(43, 26, 16, 0.7); }
+
+/* stepping onto the board: HUD settles, field breathes in, the tray deals */
+#screen-game.enter #hud { animation: title-rise 0.38s cubic-bezier(0.2, 0.7, 0.2, 1.15) both; }
+#screen-game.enter #playfield { animation: field-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1.15) 0.06s both; }
+#screen-game.enter #panel .panel-card { animation: title-rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1.15) 0.2s both; }
+#screen-game.enter .shop-card { animation: card-in 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.12s both; }
+#screen-game.enter .shop-grid .shop-card:nth-child(2) { animation-delay: 0.15s; }
+#screen-game.enter .shop-grid .shop-card:nth-child(3) { animation-delay: 0.18s; }
+#screen-game.enter .shop-grid .shop-card:nth-child(4) { animation-delay: 0.21s; }
+#screen-game.enter .shop-grid .shop-card:nth-child(5) { animation-delay: 0.24s; }
+#screen-game.enter .shop-grid .shop-card:nth-child(6) { animation-delay: 0.27s; }
+#screen-game.enter .shop-grid .shop-card:nth-child(7) { animation-delay: 0.30s; }
+#screen-game.enter .shop-grid .shop-card:nth-child(8) { animation-delay: 0.33s; }
+#screen-game.enter .shop-grid .shop-card:nth-child(9) { animation-delay: 0.36s; }
+@keyframes field-in {
+  from { opacity: 0; transform: scale(0.985) translateY(8px); }
   to { opacity: 1; }
 }
 

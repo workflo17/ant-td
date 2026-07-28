@@ -92,6 +92,7 @@ const MOD_DEFS = [
   { id: 'closing', icon: '⏰', name: 'Closing Time', desc: 'Bugs sprint +60% on the final third of the trail.' },
 ];
 let lastEndModal = null;
+let lastCrumbsSeen = null; // crumb-loss flinch tracker (reset per game)
 
 // run score + grade; records the per-map:difficulty best as a side effect.
 // Called ONCE per run end — the result is captured so re-opening the end modal
@@ -1063,6 +1064,7 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
   setSpeed(1);
   game.autoStart = els.chkAuto.checked; // carry the visible toggle into the new game
   dispSugar = null;
+  lastCrumbsSeen = null;
   renderShop();
   renderPanel();
 }
@@ -1249,6 +1251,18 @@ export function tick() {
     game.coinAmt = 0;
     lastCoinT = performance.now();
   }
+  // a leak stings: the crumbs chip flinches red when lives drop
+  if (lastCrumbsSeen != null && game.crumbs < lastCrumbsSeen) {
+    const chip = els.crumbsVal.closest('.hud-chip');
+    if (chip && chip.animate && !motionReduced()) {
+      chip.animate([
+        { transform: 'translateX(0)', backgroundColor: '#ffd9c2' },
+        { transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' },
+        { transform: 'translateX(-3px)' }, { transform: 'translateX(0)', backgroundColor: '#fff3d6' },
+      ], { duration: 340, easing: 'ease-in-out' });
+    }
+  }
+  lastCrumbsSeen = game.crumbs;
   els.crumbsVal.textContent = fmt(game.crumbs);
   els.roundVal.textContent = game.round <= 40 && !game.freeplay
     ? `${game.state === 'inround' ? game.round : Math.min(game.round + 1, 40)}/40`
@@ -1734,6 +1748,7 @@ function renderShop() {
     shopCards.push({ el: card, typeId });
   }
   els.shop.appendChild(grid);
+  syncPlacingCards(); // a rebuild must not drop the armed card's ring
 }
 
 function refreshShop() {
@@ -1754,6 +1769,13 @@ function shakeEl(el) {
   );
 }
 
+// the armed card wears the honey ring so the tray always shows what's in hand
+function syncPlacingCards() {
+  const heroCard = els.shop && els.shop.querySelector('.hero-deploy');
+  if (heroCard) heroCard.classList.toggle('placing', uiState.placingType === 'hero');
+  for (const { el, typeId } of shopCards) el.classList.toggle('placing', uiState.placingType === typeId);
+}
+
 function beginPlacing(typeId) {
   if (!game) return;
   // guided tutorial: only the step's called-for ant may be placed (blocks clicks AND hotkeys)
@@ -1770,6 +1792,7 @@ function beginPlacing(typeId) {
     uiState.selected = null;
     uiState.ghostX = null;
     renderPanel();
+    syncPlacingCards();
     return;
   }
   if (game.sugar < game.cost(typeId)) {
@@ -1783,6 +1806,7 @@ function beginPlacing(typeId) {
   uiState.selected = null;
   uiState.ghostX = null;
   renderPanel();
+  syncPlacingCards();
 }
 
 function stopPlacing() {
@@ -1791,6 +1815,7 @@ function stopPlacing() {
   uiState.casting = null;
   uiState.ghostX = null;
   renderPanel();
+  syncPlacingCards();
 }
 
 function beginCast(kind) {
