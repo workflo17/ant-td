@@ -426,6 +426,34 @@ const PREVIEW_COLORS = {
   night: ['#262138', '#5a5080'], bath: ['#b7dde0', '#8fb6bd'], kitchen: ['#dca868', '#ecdfb9'],
 };
 
+// each map's hour of light, echoed on its preview (mirrors the in-game grade):
+// warm wash from the key corner, complementary cool shade opposite
+const HOUR_TINTS = {
+  golden: [['255,196,110', 0.24], ['80,70,130', 0.16]],
+  morning: [['255,236,170', 0.18], ['70,90,130', 0.12]],
+  late: [['255,170,96', 0.28], ['90,60,120', 0.18]],
+  window: [['255,222,150', 0.26], ['60,40,20', 0.14]],
+  skylight: [['215,242,250', 0.3], ['96,140,150', 0.12]],
+  night: [['255,186,96', 0.22], ['10,6,30', 0.32]],
+};
+
+function applyHourTint(c, W, H, map) {
+  const mood = (map.light || {}).mood || (map.bg === 'night' ? 'night' : null);
+  const t = mood && HOUR_TINTS[mood];
+  if (!t) return;
+  const [[wc, wa], [cc, ca]] = t;
+  const wg = c.createLinearGradient(0, 0, W, H);
+  wg.addColorStop(0, `rgba(${wc},${wa})`);
+  wg.addColorStop(0.62, `rgba(${wc},0)`);
+  c.fillStyle = wg;
+  c.fillRect(0, 0, W, H);
+  const cg = c.createLinearGradient(W, H, 0, 0);
+  cg.addColorStop(0, `rgba(${cc},${ca})`);
+  cg.addColorStop(0.55, `rgba(${cc},0)`);
+  c.fillStyle = cg;
+  c.fillRect(0, 0, W, H);
+}
+
 // one star per difficulty beaten (easy/medium/hard win) — read straight off save.wins
 function starsForMap(mapId) {
   const s = loadSave();
@@ -487,6 +515,7 @@ function drawTrailEmblem(cv, map, locked) {
     for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0] * sx, pts[i][1] * sy);
     c.stroke();
   }
+  applyHourTint(c, D, D, map);
   if (locked) {
     c.fillStyle = 'rgba(43,26,16,0.55)';
     c.fillRect(0, 0, D, D);
@@ -718,6 +747,7 @@ function drawMapPreview(cv, map, locked) {
     for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0] * sx, pts[i][1] * sy);
     c.stroke();
   }
+  applyHourTint(c, cv.width, cv.height, map);
   if (locked) {
     c.fillStyle = 'rgba(43,26,16,0.55)';
     c.fillRect(0, 0, cv.width, cv.height);

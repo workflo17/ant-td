@@ -14,6 +14,15 @@ guided tutorial walks you through your first round.
 | ![The Caterpillar boss, health bar at full, pushes a packed swarm of layered bugs down the trail](assets/screenshots/caterpillar-push.png) | ![Night rounds on the lantern-lit porch map](assets/screenshots/night-porch.png) |
 |---|---|
 
+### The six hours
+
+Every map commits to a time of day — and the air is alive in each one:
+
+| ![Picnic Blanket at golden hour: sun shafts, drifting dandelion seeds, cloud shade](assets/gifs/picnic.gif) | ![Garden Path on a fresh morning: pollen motes over the mottled lawn](assets/gifs/garden.gif) |
+|---|---|
+| ![Kitchen Counter under paned window light: dust sinking through the beam](assets/gifs/kitchen.gif) | ![Flower Bed in late afternoon: petals falling past the daisies](assets/gifs/flowerbed.gif) |
+| ![Night Porch by lantern light: the pheromone trail glows, fireflies wander](assets/gifs/nightporch.gif) | ![Bath Time under a cool skylight: steam off the tub, bubbles adrift](assets/gifs/bath.gif) |
+
 ---
 
 A Bloons-style tower defense: pest bugs march a pheromone trail toward the colony's
@@ -322,9 +331,18 @@ request (intermittent `ERR_CONNECTION_RESET` behind localhost-filtering antiviru
 Three-layer rendering model, all procedural: **lighting** (cached radial gradients with a
 top-left key light on every body and prop, weighted hand-drawn outlines, bake-time soft
 occlusion and drop shadows), **materials** (masked chitin-noise composited soft-light, rim
-light, jointed knee legs, distance-phased gait sway, trail speckle, ambient wildlife), and
-**retina** (DPR-aware backing store up to 2×, auto-detected; force with `?dpr=2`).
-Per-type body silhouettes live in `data/enemies.js` (`bodyL`/`bodyW`).
+light, wing iridescence, jointed knee legs, distance-phased gait sway, trail speckle,
+ambient wildlife), and **retina** (DPR-aware backing store up to 2×, auto-detected; force
+with `?dpr=2`). Per-type body silhouettes live in `data/enemies.js` (`bodyL`/`bodyW`).
+
+**The hour of light** (v16): every map commits to a time of day, declared as data
+(`light: { mood, clouds, motes }` in `data/maps.js`). Baked per mood: a warm sun wash with
+a complementary cool-shade corner, low-sun shafts (picnic golden hour, garden morning,
+flower bed late afternoon), a paned window-light band on the kitchen, cool skylight in the
+bath, long stretched prop shadows at low sun. Live per mood: drifting cloud shade on
+outdoor maps, and each map's **living air** — dandelion seeds, pollen motes, falling
+petals, dust sinking through the window light, tub steam (fireflies still own the night).
+The sugar stash glows like a hearth on every map, and boss intros get a cinema letterbox.
 
 ## Performance
 

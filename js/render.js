@@ -14,6 +14,35 @@ let lastDrawTime = 0, decalFadeT = 0;
 let DPR = 1; // retina backing store; world coords stay 960x640
 let nightPools = null;      // night map: lamp pool positions for the live entity-lighting pass
 let nightGlowSprite = null; // pre-rendered warm radial glow (no per-frame gradients)
+let cloudSprite = null;     // soft cloud-shade blob, drifted across outdoor day maps
+let goalGlow = null;        // warm hearth glow marking the sugar stash
+let kitchenWedge = null;    // window-light band (world transform) — dust motes live inside it
+
+// pre-rendered atmosphere sprites, built once on first bake
+function buildLightSprites() {
+  if (!cloudSprite) {
+    cloudSprite = document.createElement('canvas');
+    cloudSprite.width = 360; cloudSprite.height = 220;
+    const cc = cloudSprite.getContext('2d');
+    cc.filter = 'blur(22px)';
+    cc.fillStyle = 'rgba(28,38,20,0.5)';
+    for (const [ex, ey, er, eh] of [[130, 110, 95, 58], [225, 95, 82, 50], [180, 140, 105, 52]]) {
+      cc.beginPath(); cc.ellipse(ex, ey, er, eh, 0, 0, TAU); cc.fill();
+    }
+    cc.filter = 'none';
+  }
+  if (!goalGlow) {
+    goalGlow = document.createElement('canvas');
+    goalGlow.width = goalGlow.height = 220;
+    const gg = goalGlow.getContext('2d');
+    const g = gg.createRadialGradient(110, 110, 6, 110, 110, 108);
+    g.addColorStop(0, 'rgba(255,206,120,0.40)');
+    g.addColorStop(0.6, 'rgba(255,186,96,0.15)');
+    g.addColorStop(1, 'rgba(255,186,96,0)');
+    gg.fillStyle = g;
+    gg.fillRect(0, 0, 220, 220);
+  }
+}
 
 export function initRender(cv) {
   canvas = cv;
@@ -27,9 +56,13 @@ export function initRender(cv) {
 // ---------- background baking ----------
 
 
+let freshDecals = []; // recent scorches still radiating heat (shimmer squiggles)
+
 // battlefield scars: stamped by explosions, slowly fade out
 export function addDecal(x, y, scale = 1) {
   if (!decalCtx) return;
+  freshDecals.push({ x, y, t: 0 });
+  if (freshDecals.length > 8) freshDecals.shift();
   decalCtx.save();
   decalCtx.translate(x, y);
   decalCtx.rotate(Math.random() * TAU);
@@ -56,6 +89,10 @@ export function bakeMap(game) {
   b.scale(DPR, DPR);
   const rng = mulberry32(1234);
   const style = game.map.bg;
+  const light = game.map.light || {};
+  const lowSun = light.mood === 'golden' || light.mood === 'late' || light.mood === 'window';
+  kitchenWedge = null;
+  buildLightSprites();
 
   if (style === 'picnic') {
     b.fillStyle = '#f8efd4';
@@ -206,6 +243,8 @@ export function bakeMap(game) {
     strokePath(b, path, 'rgba(255,244,214,0.28)', PATH_HALF_W * 2 + 1);
     b.restore();
     strokePath(b, path, trail.inner, PATH_HALF_W * 2 - 4);
+    // a million feet polish the middle: compacted gloss catches the low sun
+    if (lowSun) strokePath(b, path, 'rgba(255,244,214,0.12)', PATH_HALF_W * 1.1);
     b.setLineDash([10, 16]);
     strokePath(b, path, trail.dash, 3);
     b.setLineDash([]);
@@ -342,12 +381,12 @@ export function bakeMap(game) {
     b.restore();
   }
 
-  // props cast real soft shadows
+  // props cast real soft shadows — low-sun hours stretch them long
   b.save();
-  b.shadowColor = 'rgba(43,26,16,0.35)';
-  b.shadowBlur = 10;
-  b.shadowOffsetX = 4;
-  b.shadowOffsetY = 6;
+  b.shadowColor = lowSun ? 'rgba(43,26,16,0.4)' : 'rgba(43,26,16,0.35)';
+  b.shadowBlur = lowSun ? 12 : 10;
+  b.shadowOffsetX = lowSun ? 9 : 4;
+  b.shadowOffsetY = lowSun ? 11 : 6;
   for (const bl of game.map.blockers) drawBlocker(b, bl);
 
   // the colony food basket at the exit of path 0
@@ -409,6 +448,82 @@ export function bakeMap(game) {
     kl.addColorStop(1, 'rgba(255,244,214,0)');
     b.fillStyle = kl;
     b.fillRect(0, 0, WORLD_W, WORLD_H);
+
+    // ---- the hour of light: each map commits to a time of day (data/maps.js `light`) ----
+    const HOURS = {
+      golden: { shaft: ['255,214,140', 0.16], warm: ['255,196,110', 0.11], cool: ['80,70,130', 0.07] },
+      morning: { shaft: ['255,240,190', 0.10], warm: ['255,236,170', 0.07], cool: ['70,90,130', 0.05] },
+      late: { shaft: ['255,186,120', 0.20], warm: ['255,170, 96', 0.13], cool: ['90,60,120', 0.08] },
+    };
+    const hour = light.mood && HOURS[light.mood];
+    if (hour) {
+      // warm sun wash from the key-light corner, complementary cool shade opposite —
+      // the two-tone grade that makes an hour read as an hour
+      const ww = b.createLinearGradient(0, 0, WORLD_W, WORLD_H);
+      ww.addColorStop(0, `rgba(${hour.warm[0]},${hour.warm[1]})`);
+      ww.addColorStop(0.55, `rgba(${hour.warm[0]},0)`);
+      b.fillStyle = ww;
+      b.fillRect(0, 0, WORLD_W, WORLD_H);
+      const cw = b.createLinearGradient(WORLD_W, WORLD_H, 0, 0);
+      cw.addColorStop(0, `rgba(${hour.cool[0]},${hour.cool[1]})`);
+      cw.addColorStop(0.5, `rgba(${hour.cool[0]},0)`);
+      b.fillStyle = cw;
+      b.fillRect(0, 0, WORLD_W, WORLD_H);
+      // low-sun shafts rake in from the key-light corner
+      b.save();
+      b.rotate(0.5);
+      for (const [sx, sw] of [[140, 130], [420, 90], [670, 170]]) {
+        const g = b.createLinearGradient(sx, 0, sx + sw, 0);
+        g.addColorStop(0, `rgba(${hour.shaft[0]},0)`);
+        g.addColorStop(0.5, `rgba(${hour.shaft[0]},${hour.shaft[1]})`);
+        g.addColorStop(1, `rgba(${hour.shaft[0]},0)`);
+        b.fillStyle = g;
+        b.fillRect(sx, -340, sw, 1520);
+      }
+      b.restore();
+    } else if (light.mood === 'window') {
+      // one warm window-light band falls across the counter, split into panes
+      const wx = 640, wy = -40, rot = 0.34, ww = 330, wh = 860;
+      b.save();
+      b.translate(wx, wy);
+      b.rotate(rot);
+      const wg = b.createLinearGradient(0, 0, 0, wh);
+      wg.addColorStop(0, 'rgba(255,222,150,0.26)');
+      wg.addColorStop(1, 'rgba(255,222,150,0.05)');
+      b.fillStyle = wg;
+      b.fillRect(-ww / 2, 0, ww, wh);
+      b.fillStyle = 'rgba(120,72,28,0.09)'; // muntin shadows
+      b.fillRect(-ww / 6 - 8, 0, 16, wh);
+      b.fillRect(ww / 6 - 8, 0, 16, wh);
+      b.restore();
+      kitchenWedge = { x: wx, y: wy, rot, w: ww, h: wh };
+      // pre-render the band's warm lift once: draw() re-tints actors crossing it
+      // (additive, soft-edged so the light feathers instead of striping)
+      const bandCv = document.createElement('canvas');
+      bandCv.width = ww; bandCv.height = wh;
+      const bc = bandCv.getContext('2d');
+      const bg2 = bc.createLinearGradient(0, 0, 0, wh);
+      bg2.addColorStop(0, 'rgba(255,214,140,0.09)');
+      bg2.addColorStop(1, 'rgba(255,214,140,0.02)');
+      bc.fillStyle = bg2;
+      bc.fillRect(0, 0, ww, wh);
+      bc.globalCompositeOperation = 'destination-in';
+      const lat = bc.createLinearGradient(0, 0, ww, 0);
+      lat.addColorStop(0, 'rgba(0,0,0,0)');
+      lat.addColorStop(0.25, 'rgba(0,0,0,1)');
+      lat.addColorStop(0.75, 'rgba(0,0,0,1)');
+      lat.addColorStop(1, 'rgba(0,0,0,0)');
+      bc.fillStyle = lat;
+      bc.fillRect(0, 0, ww, wh);
+      kitchenWedge.sprite = bandCv;
+    } else if (light.mood === 'skylight') {
+      // cool clean morning light from the high bathroom window
+      const sg = b.createLinearGradient(0, 0, 130, 430);
+      sg.addColorStop(0, 'rgba(215,242,250,0.24)');
+      sg.addColorStop(1, 'rgba(215,242,250,0)');
+      b.fillStyle = sg;
+      b.fillRect(0, 0, WORLD_W, WORLD_H);
+    }
   }
 
   // ---- depth pass: push the baked world back so live ants & bugs read as foreground ----
@@ -998,6 +1113,37 @@ function updateCritters(game, time, rdt) {
       });
     }
   }
+  // living air: each map's hour drifts its own motes (pure atmosphere, small caps,
+  // every particle on its own phase so nothing moves in lockstep)
+  {
+    const AIR = { seed: 4, pollen: 7, petal: 5, dust: 9, steam: 2 };
+    const kind = (game.map.light || {}).motes;
+    if (kind && AIR[kind] && critterT <= 0) {
+      let n = 0;
+      for (const cr of critters) if (cr.kind === kind || (kind === 'steam' && cr.kind === 'steam')) n++;
+      if (n < AIR[kind]) {
+        critterT = kind === 'dust' ? 0.6 : 1.2 + Math.random() * 2;
+        if (kind === 'seed') {
+          critters.push({ kind, x: 60 + Math.random() * (WORLD_W - 120), y: -16, vy: 9 + Math.random() * 6,
+            drift: Math.random() * TAU, age: 0, life: 80, phase: Math.random() * 10 });
+        } else if (kind === 'pollen') {
+          critters.push({ kind, x: 40 + Math.random() * (WORLD_W - 80), y: 40 + Math.random() * (WORLD_H - 80),
+            drift: Math.random() * TAU, age: 0, life: 14 + Math.random() * 8, phase: Math.random() * 10 });
+        } else if (kind === 'petal') {
+          critters.push({ kind, x: 40 + Math.random() * (WORLD_W - 80), y: -14, vy: 13 + Math.random() * 8,
+            drift: Math.random() * TAU, age: 0, life: 60, phase: Math.random() * 10, hue: (Math.random() * 3) | 0 });
+        } else if (kind === 'dust' && kitchenWedge) {
+          critters.push({ kind, lx: (Math.random() - 0.5) * (kitchenWedge.w - 60),
+            ly: 60 + Math.random() * (kitchenWedge.h - 200),
+            drift: Math.random() * TAU, age: 0, life: 16 + Math.random() * 8, phase: Math.random() * 10 });
+        } else if (kind === 'steam') {
+          const tub = game.map.blockers.find(bl => bl.type === 'tub');
+          if (tub) critters.push({ kind: 'steam', x: tub.x + (Math.random() - 0.5) * 90,
+            y: tub.y - 12, age: 0, life: 4, phase: Math.random() * 10 });
+        }
+      }
+    }
+  }
   if (critters.length < 4 && critterT <= 0) {
     critterT = 4 + Math.random() * 6;
     if (bg === 'night') {
@@ -1032,6 +1178,33 @@ function updateCritters(game, time, rdt) {
   for (const cr of critters) {
     cr.age += rdt;
     if (cr.kind === 'steam') continue;
+    if (cr.kind === 'seed') {
+      // dandelion seed: a slow spiral fall, riding tiny gusts
+      cr.y += cr.vy * rdt;
+      cr.x += Math.sin(cr.age * 1.2 + cr.drift) * 18 * rdt;
+      if (cr.y > WORLD_H + 20) cr.age = cr.life + 1;
+      continue;
+    }
+    if (cr.kind === 'pollen') {
+      // pollen mote: aimless golden wander
+      cr.x += Math.cos(cr.age * 0.9 + cr.drift) * 12 * rdt;
+      cr.y += Math.sin(cr.age * 1.3 + cr.drift * 2) * 9 * rdt - 3 * rdt;
+      continue;
+    }
+    if (cr.kind === 'petal') {
+      // falling petal: rocks side to side as it drops
+      cr.y += cr.vy * rdt;
+      cr.x += Math.sin(cr.age * 2.1 + cr.drift) * 22 * rdt;
+      if (cr.y > WORLD_H + 16) cr.age = cr.life + 1;
+      continue;
+    }
+    if (cr.kind === 'dust') {
+      // dust motes sink slowly along the window light
+      cr.ly += 7 * rdt;
+      cr.lx += Math.sin(cr.age * 0.8 + cr.drift) * 6 * rdt;
+      if (kitchenWedge && cr.ly > kitchenWedge.h - 40) cr.age = cr.life + 1;
+      continue;
+    }
     if (cr.kind === 'bubble') {
       cr.y += cr.vy * rdt;
       cr.x += Math.sin(cr.age * 1.6 + cr.drift) * 14 * rdt;
@@ -1064,6 +1237,47 @@ function drawCritters(time) {
         ctx.beginPath();
         ctx.arc(cr.x + Math.sin((p * 5) + cr.phase + i) * 7, cr.y - p * 46, 4 + p * 7, 0, TAU);
         ctx.fill();
+      }
+    } else if (cr.kind === 'seed') {
+      // white tufted seed catching the light
+      const lifeK = Math.min(1, cr.age / 2, Math.max(0, (WORLD_H + 18 - cr.y) / 60));
+      ctx.globalAlpha = 0.8 * Math.max(0, lifeK);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 1.1;
+      const rot = Math.sin(cr.age * 1.6 + cr.drift) * 0.5;
+      for (let i = 0; i < 5; i++) {
+        const a = -Math.PI / 2 + rot + (i - 2) * 0.42;
+        ctx.beginPath();
+        ctx.moveTo(cr.x, cr.y);
+        ctx.lineTo(cr.x + Math.cos(a) * 7, cr.y + Math.sin(a) * 7);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(255,244,214,0.95)';
+      ctx.beginPath(); ctx.arc(cr.x, cr.y, 1.3, 0, TAU); ctx.fill();
+    } else if (cr.kind === 'pollen') {
+      const lifeK = Math.min(1, cr.age / 1.5, Math.max(0, (cr.life - cr.age) / 1.5));
+      const a = Math.max(0, lifeK) * (0.2 + 0.25 * Math.sin(cr.age * 3 + cr.phase));
+      ctx.fillStyle = `rgba(255,233,160,${Math.max(0, a)})`;
+      ctx.beginPath(); ctx.arc(cr.x, cr.y, 1.5, 0, TAU); ctx.fill();
+    } else if (cr.kind === 'petal') {
+      const lifeK = Math.min(1, cr.age / 1.2, Math.max(0, (WORLD_H + 14 - cr.y) / 50));
+      ctx.globalAlpha = 0.85 * Math.max(0, lifeK);
+      ctx.translate(cr.x, cr.y);
+      ctx.rotate(Math.sin(cr.age * 2.1 + cr.drift) * 0.8);
+      ctx.fillStyle = ['#ffb7de', '#e6c9f5', '#fff4d6'][cr.hue || 0];
+      ctx.strokeStyle = 'rgba(43,26,16,0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(0, 0, 6, 3, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    } else if (cr.kind === 'dust') {
+      if (kitchenWedge) {
+        // wedge-local -> world (motes live inside the window light)
+        const cs = Math.cos(kitchenWedge.rot), sn = Math.sin(kitchenWedge.rot);
+        const wx = kitchenWedge.x + cr.lx * cs - cr.ly * sn;
+        const wy = kitchenWedge.y + cr.lx * sn + cr.ly * cs;
+        const lifeK = Math.min(1, cr.age / 2, Math.max(0, (cr.life - cr.age) / 2));
+        const a = Math.max(0, lifeK) * (0.16 + 0.2 * Math.sin(cr.age * 2.2 + cr.phase));
+        ctx.fillStyle = `rgba(255,240,200,${Math.max(0, a)})`;
+        ctx.beginPath(); ctx.arc(wx, wy, 1.4, 0, TAU); ctx.fill();
       }
     } else if (cr.kind === 'firefly') {
       // blink cycle: mostly dark, periodic warm pulse (fade in/out at spawn/despawn)
@@ -1176,6 +1390,8 @@ export function draw(game, ui, time) {
     }
   }
 
+  const light = game.map.light || {};
+
   // living map details
   if (game.map.bg === 'garden') {
     const pond = game.map.blockers.find(bl => bl.type === 'pond');
@@ -1191,10 +1407,19 @@ export function draw(game, ui, time) {
       }
     }
   }
-  { // sugar pile twinkles at the basket
+  { // the stash is the hearth: a warm breathing glow marks what the colony defends
     const pts = game.paths[0].points;
     const gx = Math.min(pts[pts.length - 1][0], WORLD_W - 44);
     const gy = pts[pts.length - 1][1];
+    if (goalGlow) {
+      const gr = 95 * (1 + Math.sin(time * 1.8) * 0.07);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.8;
+      ctx.drawImage(goalGlow, gx - gr, gy - gr + 8, gr * 2, gr * 2);
+      ctx.restore();
+    }
+    // sugar pile twinkles
     const tw = (time * 0.45) % 1;
     if (tw < 0.16) {
       const k = Math.sin((tw / 0.16) * Math.PI);
@@ -1213,6 +1438,7 @@ export function draw(game, ui, time) {
     const spot = { x: 0, y: 0, angle: 0, seg: 0 };
     const SP = 58;
     const off = (time * 60) % SP;
+    const dusk = game.map.bg === 'night'; // after dark the scent itself glows
     ctx.lineCap = 'round';
     for (const path of game.paths) {
       spot.seg = 0;
@@ -1220,6 +1446,10 @@ export function draw(game, ui, time) {
         posAt(path, d, spot, spot.seg);
         const tw = 0.5 + 0.5 * Math.sin(time * 3 + d * 0.05);
         const dx = Math.cos(spot.angle), dy = Math.sin(spot.angle);
+        if (dusk) { // soft halo under each comet head
+          ctx.fillStyle = `rgba(255,214,140,${0.08 + tw * 0.08})`;
+          ctx.beginPath(); ctx.arc(spot.x, spot.y, 6.5 + tw * 3, 0, TAU); ctx.fill();
+        }
         // motion tail trailing behind the flow direction
         ctx.strokeStyle = `rgba(255,238,186,${0.2 + tw * 0.16})`;
         ctx.lineWidth = 2.4;
@@ -1401,6 +1631,51 @@ export function draw(game, ui, time) {
   drawCritters(time);
   drawParticles(ctx);
 
+  // heat shimmer rises off fresh scorch marks: cartoon squiggles that fade fast
+  if (freshDecals.length) {
+    ctx.lineWidth = 1.6;
+    for (let i = freshDecals.length - 1; i >= 0; i--) {
+      const fd = freshDecals[i];
+      fd.t += rdt;
+      if (fd.t > 2.2) { freshDecals.splice(i, 1); continue; }
+      const k = 1 - fd.t / 2.2;
+      ctx.strokeStyle = `rgba(255,255,255,${0.12 * k})`;
+      for (let s = -1; s <= 1; s += 2) {
+        const hx = fd.x + s * 6;
+        ctx.beginPath();
+        for (let yy = 0; yy <= 16; yy += 4) {
+          const wob = Math.sin(time * 9 + yy * 0.5 + s + fd.x) * 2.2;
+          if (yy === 0) ctx.moveTo(hx + wob, fd.y - 4 - yy - fd.t * 8);
+          else ctx.lineTo(hx + wob, fd.y - 4 - yy - fd.t * 8);
+        }
+        ctx.stroke();
+      }
+    }
+  }
+
+  // ---- light falls on the actors too (post-passes over everything drawn) ----
+  // drifting cloud shade: two soft shadows cross the board on a ~2-minute cycle
+  if (light.clouds && cloudSprite) {
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < 2; i++) {
+      const span = WORLD_W + 1100;
+      const cx2 = span - (((time * 7) + i * 640) % span) - 550;
+      const cy2 = 20 + i * 290 + Math.sin(time * 0.08 + i * 2) * 26;
+      ctx.drawImage(cloudSprite, cx2, cy2, 660, 400);
+    }
+    ctx.restore();
+  }
+  // kitchen window band: actors crossing the light warm up (additive lift)
+  if (kitchenWedge && kitchenWedge.sprite) {
+    ctx.save();
+    ctx.translate(kitchenWedge.x, kitchenWedge.y);
+    ctx.rotate(kitchenWedge.rot);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(kitchenWedge.sprite, -kitchenWedge.w / 2, 0);
+    ctx.restore();
+  }
+
   // Bath Time's sweeping shower spray: translucent blue band + falling droplets
   if (game.map.hazard && game.map.hazard.type === 'sweep') {
     const w = (game.map.hazard.width || 0.55) / 2;
@@ -1524,6 +1799,11 @@ export function draw(game, ui, time) {
     if (ban.boss) {
       ctx.fillStyle = `rgba(30,16,8,${0.32 * Math.min(inK, outK)})`;
       ctx.fillRect(-20, -20, WORLD_W + 40, WORLD_H + 40);
+      // cinema letterbox: the world holds its breath for the boss
+      const bh = 46 * Math.min(inK, outK);
+      ctx.fillStyle = 'rgba(14,8,4,0.92)';
+      ctx.fillRect(-30, -30, WORLD_W + 60, bh + 30);
+      ctx.fillRect(-30, WORLD_H - bh, WORLD_W + 60, bh + 30);
     }
     ctx.save();
     ctx.globalAlpha = outK;

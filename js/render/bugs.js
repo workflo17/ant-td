@@ -46,6 +46,19 @@ export function drawBugBody(c, e, time) {
       c.beginPath();
       c.ellipse(-r * 0.9, 0, r * 1.15, r * 0.42, 0, 0, TAU);
       c.fill(); c.stroke();
+      // iridescent sheen: a cool/warm arc that flickers as the wing beats
+      // (skipped on the tiniest wings — invisible there, and swarms stay cheap)
+      if (r >= 11) {
+        c.strokeStyle = side > 0
+          ? `rgba(170,220,255,${0.22 + 0.16 * Math.sin(time * 21 + e.phase)})`
+          : `rgba(255,190,235,${0.22 + 0.16 * Math.cos(time * 19 + e.phase)})`;
+        c.lineWidth = 1.8;
+        c.beginPath();
+        c.ellipse(-r * 0.9, 0, r * 0.88, r * 0.28, 0, -2.7, -0.5);
+        c.stroke();
+        c.strokeStyle = 'rgba(43,26,16,0.5)';
+        c.lineWidth = 1.6;
+      }
       c.restore();
     }
   }
@@ -321,6 +334,11 @@ export function drawSnailShell(c, e) {
   c.beginPath();
   c.arc(-r * 0.5, -r * 0.35, r * 0.3, 2.4, 2.4 + TAU * 0.7);
   c.stroke();
+  // polished-shell glint on the lit shoulder
+  c.fillStyle = 'rgba(255,244,214,0.4)';
+  c.beginPath();
+  c.ellipse(-r * 0.85, -r * 0.72, r * 0.26, r * 0.14, -0.6, 0, TAU);
+  c.fill();
 }
 
 export function drawStatusFx(c, e, time) {

@@ -31,12 +31,19 @@ export function fireProjectile(game, props) {
   return p;
 }
 
+// what a blast kicks up depends on the ground it lands on
+const BLAST_DEBRIS = {
+  picnic: '#ffd9ec', garden: '#63a832', flowerbed: '#ffb7de',
+  kitchen: '#e8c187', night: '#8a7fc0', bath: '#bfe6f0',
+};
+
 function explode(game, x, y, p) {
   sfx.boom();
   explosionFx(x, y, p.blast);          // flash + additive glow + rising smoke
   ring(x, y, '#ffd166', 8, p.blast * 6, 0.22);
   ring(x, y, '#e2762a', 4, p.blast * 4.4, 0.3);
   burst(x, y, '#ffb020', 12, 160);
+  burst(x, y, BLAST_DEBRIS[game.map.bg] || '#c9a06b', 8, 130); // ground flecks
   addDecal(x, y, p.blast / 40);        // lingering scorch mark
   game.shake = Math.min(0.4, game.shake + 0.15);
   // directional camera kick, away from the blast

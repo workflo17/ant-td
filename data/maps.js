@@ -12,6 +12,8 @@ export const MAPS = [
   {
     id: 'picnic', name: 'Picnic Blanket', tag: 'Gentle',
     bg: 'picnic', unlock: null,
+    // the hour of light: every map commits to a time of day (render reads `light`)
+    light: { mood: 'golden', clouds: true, motes: 'seed' },
     blurb: 'A lazy S-curve across the family blanket. Long marches, easy pickings.',
     paths: [
       [[-40, 130], [360, 130], [360, 330], [140, 330], [140, 520], [1000, 520]],
@@ -27,6 +29,7 @@ export const MAPS = [
   {
     id: 'garden', name: 'Garden Path', tag: 'Tricky',
     bg: 'garden', unlock: { best: 12, label: 'Reach round 12 on any map' },
+    light: { mood: 'morning', clouds: true, motes: 'pollen' },
     blurb: 'The trail loops back over itself. Watch both lanes of the crossing.',
     paths: [
       [[-40, 260], [620, 260], [620, 110], [300, 110], [300, 460], [1000, 460]],
@@ -43,6 +46,7 @@ export const MAPS = [
   {
     id: 'kitchen', name: 'Kitchen Counter', tag: 'Brutal',
     bg: 'kitchen', unlock: { best: 24, label: 'Reach round 24 on any map' },
+    light: { mood: 'window', clouds: false, motes: 'dust' },
     blurb: 'Two entrances, short trails. Bugs pour in from the left AND the top.',
     paths: [
       [[-40, 180], [430, 180], [430, 420], [1000, 420]],
@@ -59,6 +63,7 @@ export const MAPS = [
   {
     id: 'flowerbed', name: 'Flower Bed', tag: 'Cruel',
     bg: 'flowerbed', unlock: { best: 32, label: 'Reach round 32 on any map' },
+    light: { mood: 'late', clouds: true, motes: 'petal' },
     blurb: 'A short sprint between the blossoms. Giant flowers crowd your build space.',
     paths: [
       [[-40, 320], [330, 320], [330, 140], [680, 140], [680, 460], [1000, 460]],
@@ -95,6 +100,7 @@ export const MAPS = [
   {
     id: 'bath', name: 'Bath Time', tag: 'Soaked',
     bg: 'bath', unlock: { best: 38, label: 'Reach round 38 on any map' },
+    light: { mood: 'skylight', clouds: false, motes: 'steam' },
     blurb: 'Slick tile around the tub. The shower spray sweeps the room — bugs slog through it, but ants in it attack slower too.',
     // rotating shower-spray sector: slows bugs AND debuffs tower attack speed inside the band
     hazard: { type: 'sweep', period: 14, width: 0.7 },
