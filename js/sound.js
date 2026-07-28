@@ -441,6 +441,20 @@ export const sfx = {
     tone(98, 0.7, { type: 'sawtooth', vol: 0.2, slide: -18 }); tone(147, 0.7, { type: 'sawtooth', vol: 0.14, slide: -22, delay: 0.05 }); noise(0.5, { vol: 0.12, freq: 500, delay: 0.05 });
   },
   stamp() { if (throttled('stamp', 300)) return; tone(90, 0.16, { type: 'sine', vol: 0.22, slide: -30 }); noise(0.08, { vol: 0.14, freq: 900 }); },
+  // the iris breathes: a soft air-swipe closing, a lighter one opening
+  iris() {
+    if (playSample('whoosh', { vol: 0.15, rate: 1.2 })) return;
+    noise(0.2, { vol: 0.08, freq: 900 }); tone(300, 0.18, { type: 'sine', vol: 0.04, slide: -140 });
+  },
+  irisOpen() {
+    if (playSample('whoosh', { vol: 0.11, rate: 1.55 })) return;
+    noise(0.16, { vol: 0.06, freq: 1300 }); tone(240, 0.16, { type: 'sine', vol: 0.035, slide: 160 });
+  },
+  // defeat: the color drains — one long low fall under the dusk wash
+  drain() {
+    if (playSample('whoosh', { vol: 0.2, rate: 0.5 })) { tone(196, 0.7, { type: 'sine', vol: 0.05, slide: -110 }); return; }
+    tone(220, 0.8, { type: 'sine', vol: 0.08, slide: -140 }); noise(0.6, { vol: 0.05, freq: 500 });
+  },
   // PERFECT ROUND jingle: rising gold arpeggio, crowned with the FM bell
   perfect() {
     [659, 784, 988, 1319].forEach((f, i) => tone(f, 0.16, { type: 'triangle', vol: 0.15, delay: i * 0.07 }));

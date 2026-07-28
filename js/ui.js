@@ -378,6 +378,18 @@ export function init() {
   document.body.classList.add('boot');
   setTimeout(() => document.body.classList.remove('boot'), 1000);
 
+  // ...and it hums: the first gesture starts the menu theme (autoplay-safe —
+  // audio contexts only wake inside a user gesture). A run owns its own score.
+  const wakeMusic = () => {
+    if (game) return;
+    unlockAudio();
+    setMapTheme('menu');
+    setIntensity(0);
+    ensureStarted();
+  };
+  window.addEventListener('pointerdown', wakeMusic, { once: true });
+  window.addEventListener('keydown', wakeMusic, { once: true });
+
   // tiny build stamp (confirms a phone isn't stuck on a stale cached version)
   const tag = document.createElement('div');
   tag.id = 'build-tag';
@@ -423,6 +435,8 @@ function showTitle() {
   stopMenuScene();
   if (els.screenTitle) els.screenTitle.classList.remove('hidden');
   startTitleScene();
+  setMapTheme('menu'); // the soundtrack comes home with you
+  setIntensity(0);
   refreshTitle();
 }
 
@@ -446,6 +460,7 @@ function irisTo(go, x, y) {
   const hole = wrap.firstElementChild;
   irisBusy = true;
   wrap.style.display = 'block';
+  sfx.iris();
   const place = (cx, cy) => {
     const R = Math.hypot(Math.max(cx, window.innerWidth - cx), Math.max(cy, window.innerHeight - cy)) + 40;
     hole.style.left = (cx - R) + 'px';
@@ -475,6 +490,7 @@ function irisTo(go, x, y) {
     };
     // timers, not rAF: rAF never fires in a hidden tab and the ink would stick
     setTimeout(() => {
+      sfx.irisOpen();
       const open = hole.animate(
         [{ transform: 'scale(0.001)' }, { transform: 'scale(1)' }],
         { duration: 380, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' }
@@ -504,6 +520,8 @@ function showLevels() {
   stopTitleScene();
   els.screenMenu.classList.remove('hidden');
   startMenuScene();
+  setMapTheme('menu'); // the soundtrack comes home with you
+  setIntensity(0);
   playEntrance(els.screenMenu);
   renderMenu();
 }
@@ -1406,6 +1424,7 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
       const sp = scoreParts(); // judged once — the reopened modal keeps its verdict
       // the color drains from the field for a beat before the verdict arrives
       els.screenGame.classList.add('defeat');
+      if (!motionReduced()) sfx.drain(); // the beat's sound belongs to the beat
       lastEndModal = () => showModal(`
         <div class="modal-title lose">THE SUGAR IS GONE</div>
         <p>The bugs broke through on round ${game.round} of ${mapDef.name}.</p>
@@ -2548,6 +2567,10 @@ function showModal(html, buttons = [], opts = {}) {
   cancelAnimationFrame(paradeRaf);
   if (opts.variant === 'win') { burstConfetti(fx); startWinParade(fx); }
   else if (opts.variant === 'lose') driftEmbers(fx);
+  if (opts.variant === 'win' || opts.variant === 'lose') {
+    // the grade thuds down exactly when the stamp lands (instantly under reduced motion)
+    setTimeout(() => { if (!modal.classList.contains('hidden')) sfx.stamp(); }, motionReduced() ? 100 : 780);
+  }
   modalPrevFocus = document.activeElement;
   const first = row.querySelector('button');
   if (first) first.focus();

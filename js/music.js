@@ -16,6 +16,12 @@ const MINOR = [0, 3, 5, 7, 10, 12, 15, 17];
 // ---- per-map identity: transposition, feel, tempo AND melody (set from startGame) ----
 // lead / leadB: 16-step degree patterns (A section / B section), null = rest
 const MAP_THEMES = {
+  menu: { // the front porch: the picnic tune slowed to a lullaby rock — no kit,
+    // intensity 0 lets the melody breathe in on even bars and out on odd ones
+    rootOff: 0, bpm: 86, ambient: 'breeze',
+    lead:  [0, null, 2, null, 4, null, null, null, 5, null, 4, null, 2, null, null, null],
+    leadB: [4, null, 5, null, 7, null, null, null, 5, null, 4, null, 2, null, 1, null],
+  },
   picnic: { // sunny A major, an easy porch-swing tune
     rootOff: 0, bpm: 112, ambient: 'breeze',
     lead:  [0, null, 2, null, 4, null, 2, null, 5, 4, null, 2, null, 1, null, null],
