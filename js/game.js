@@ -1,6 +1,6 @@
 // ===== Game orchestrator: economy, rounds, placement, buffs, win/lose =====
 import { WORLD_W, WORLD_H, PATH_HALF_W } from '../data/maps.js';
-import { WAVES, freeplayRound, freeplayHpMul, roundBonus, easyAdjust, hardAdjust, START_SUGAR, START_CRUMBS, DIFFICULTY, DECOY, HONEYPOT_STACK, ROUND_MODS } from '../data/waves.js';
+import { WAVES, freeplayRound, freeplayHpMul, roundBonus, easyAdjust, hardAdjust, START_SUGAR, START_CRUMBS, DIFFICULTY, DECOY, HONEYPOT_STACK, HONEYPOT_MAX, ROUND_MODS } from '../data/waves.js';
 import { REGEN_CHAIN } from '../data/enemies.js';
 
 // BROOD rounds / Broodmother: every chain bug spawns one step up its ladder
@@ -404,9 +404,16 @@ export class Game {
         textPop(t.x, t.y - 24, `+${amt}`, '#ffd166');
       }
     }
+    // interest obeys the same stacking rule — N banks were paying N× full caps
+    let bankIdx = 0;
     for (const t of this.towers) {
+      if (!t.stats.income) continue; // pot order matches the income loop above
+      const stackMul = Math.pow(HONEYPOT_STACK, bankIdx++);
       if (t.stats.interest) {
-        const amt = Math.min(t.stats.interestCap, Math.floor(this.sugar * t.stats.interest * this.incomeMul));
+        const amt = Math.min(
+          Math.round(t.stats.interestCap * stackMul),
+          Math.floor(this.sugar * t.stats.interest * stackMul * this.incomeMul)
+        );
         if (amt > 0) {
           this.sugar += amt;
           this.stats.earned += amt;
@@ -1006,6 +1013,12 @@ export class Game {
   placeTower(typeId, x, y) {
     if (this.unlockedTypes && !this.unlockedTypes.has(typeId)) { sfx.deny(); return null; } // draft it first
     if (this.relics.dowry && this.round >= 25) { sfx.deny(); return null; } // Queen's Dowry: the roster is sealed
+    // the colony feeds only so many repletes — farms are bounded by biology
+    if (typeId === 'honeypot' && this.towers.filter(t => t.stats.income).length >= HONEYPOT_MAX) {
+      textPop(x, y - 14, `the colony feeds only ${HONEYPOT_MAX} repletes`, '#ffd9c2', 13);
+      sfx.deny();
+      return null;
+    }
     const c = this.cost(typeId);
     if (this.sugar < c) { sfx.deny(); return null; }
     if (!this.canPlace(typeId, x, y)) { sfx.deny(); return null; }

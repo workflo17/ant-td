@@ -143,7 +143,7 @@ export const TOWERS = {
 
   honeypot: {
     name: 'Honeypot Replete', cost: 300, footprint: 19, hotkey: '8',
-    tagline: 'A living sugar bank. Pays every round; extra pots pay less.',
+    tagline: 'A living sugar bank. Extra pots pay less — the colony feeds at most 4.',
     color: '#f5a623', dark: '#8a5a00',
     base: { attack: null, income: 60 },
     paths: {
