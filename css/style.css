@@ -1060,8 +1060,39 @@ body.boot #screen-title { animation: boot-bloom 0.55s ease-out both; }
   .shop-grid { grid-template-columns: 1fr 1fr; }
 }
 
+/* ---- mobile board camera companions ---- */
+/* staged placement: ✓/✗ float beside the parked ghost (thumb-sized targets) */
+#place-confirm { position: absolute; z-index: 6; display: flex; gap: 10px; }
+#place-confirm.hidden { display: none; }
+#place-confirm .sticker {
+  min-width: 52px; min-height: 52px; border-radius: 999px;
+  font-size: 24px; font-weight: 900; line-height: 1; padding: 0 12px;
+  touch-action: manipulation;
+  animation: chip-pop 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+#pc-yes { background: var(--leaf); color: var(--cream); }
+#pc-no { background: var(--red); color: var(--cream); }
+@keyframes chip-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* one-time rotate hint: a friendly card at the fold, never a wall */
+#rotate-hint {
+  position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  z-index: 60; display: flex; align-items: center; gap: 10px;
+  max-width: min(92vw, 420px); padding: 10px 12px;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 14px;
+  box-shadow: 4px 4px 0 rgba(43, 26, 16, 0.4);
+  animation: chip-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+#rotate-hint .rh-icon { font-size: 26px; }
+#rotate-hint .rh-text { font-size: 13px; line-height: 1.35; }
+#rotate-hint .rh-btn { min-height: 44px; padding: 6px 14px; flex-shrink: 0; touch-action: manipulation; }
+
 @media (prefers-reduced-motion: reduce) {
   .sticker, .hud-btn.pulse { transition: none; animation: none !important; }
+  #place-confirm .sticker, #rotate-hint { animation: none !important; }
   /* the cinematic layer stands down as one: modal entrances/backdrop dims, foil
      sheens, grade stamps, content staggers, and both screen-arrival cascades.
      (Confetti and embers are skipped in JS; the scenes render a single frame.) */

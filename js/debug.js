@@ -7,6 +7,7 @@ import { draw } from './render.js';
 import { uiState, postcardDataURL } from './ui.js';
 import { musicState } from './music.js';
 import { soundState, unlockAudio } from './sound.js';
+import { cam as boardCam, clampCam } from './camera.js';
 
 export function isDebug() {
   return new URLSearchParams(location.search).has('debug');
@@ -34,6 +35,10 @@ export function initDebug(api) {
     clear() { const g = api.getGame(); if (g) for (const e of g.enemies) e.dead = true; },
     music() { return musicState(); },
     sound() { unlockAudio(); return soundState(); },
+    cam(x, y, z) {
+      if (x != null) { boardCam.x = x; boardCam.y = y; if (z != null) boardCam.z = z; clampCam(); }
+      return { ...boardCam };
+    },
     swarm(n = 300) {
       const g = api.getGame();
       const mix = ['moth', 'moth', 'hopper', 'snail', 'weevil', 'moth'];

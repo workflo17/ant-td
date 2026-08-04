@@ -1,5 +1,6 @@
 // ===== All art is drawn here, procedurally. Chunky cartoon: flat fills + thick ink outlines. =====
 import { WORLD_W, WORLD_H, PATH_HALF_W } from '../data/maps.js';
+import { cam } from './camera.js';
 import { TAU, mulberry32, posAt } from './util.js';
 import { drawParticles } from './particles.js';
 import { INK, mixHex, bodyGrad, rr } from './render/helpers.js';
@@ -1385,6 +1386,8 @@ export function draw(game, ui, time) {
   lastDrawTime = time;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); // world units on a retina backing store
   ctx.clearRect(0, 0, WORLD_W, WORLD_H);
+  // board camera: phones pinch-zoom into the world; at z=1 this is the old identity view
+  ctx.setTransform(DPR * cam.z, 0, 0, DPR * cam.z, -cam.x * DPR * cam.z, -cam.y * DPR * cam.z);
   ctx.save();
   if (game && game.shake > 0 && shakeEnabled) {
     ctx.translate((Math.random() - 0.5) * game.shake * 14, (Math.random() - 0.5) * game.shake * 14);
@@ -1863,6 +1866,10 @@ export function draw(game, ui, time) {
     }
   }
 
+  // banners + boss bars pin to the viewport, not the world — step outside the camera
+  ctx.restore();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
   // banners: boss intro wins over round stamp
   const ban = (game.bossBanner && game.bossBanner.t > 0) ? game.bossBanner
     : (game.roundBanner && game.roundBanner.t > 0) ? game.roundBanner : null;
@@ -1902,8 +1909,6 @@ export function draw(game, ui, time) {
   }
 
   drawBossBars(game, time);
-
-  ctx.restore();
 }
 
 // ---------- BTD6-style boss health bars (top-center, up to 2 stacked) ----------

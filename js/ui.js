@@ -5,6 +5,7 @@ import { ENEMIES } from '../data/enemies.js';
 import { TOWERS, TOWER_ORDER, SELL_RATIO } from '../data/towers.js';
 import { HEROES, HERO_ORDER, XP_LEVELS, ABILITY_UNLOCK_LEVEL } from '../data/heroes.js';
 import { Game } from './game.js';
+import { cam, CAM_MAX, resetCam, clampCam } from './camera.js';
 import { bakeMap, drawTowerIcon, drawAnt, setShakeEnabled, setReducedFlash } from './render.js';
 import { startTitleScene, stopTitleScene, startMenuScene, stopMenuScene, setMenuMood } from './title.js';
 import { setReducedFx } from './particles.js';
@@ -71,10 +72,11 @@ export const uiState = {
   ghostX: null, ghostY: null, ghostValid: false,
   selected: null,
   casting: null, // 'rain' | 'guards'
+  pendingPlace: null, // touch stages a spot here; the ✓ chip commits it
 };
 
 // bump on every mobile-input change so we can confirm a phone isn't on a stale cache
-const BUILD = 'input3-touch+click';
+const BUILD = 'input4-camera+confirm';
 let selMapId = 'picnic';
 let selDiff = 'easy';
 let dispSugar = null;    // tweened HUD sugar value
@@ -633,6 +635,8 @@ function showHowToPlay() {
       <p><b>🍬 Sugar</b> is money: every bug you pop pays sugar. Spend it on more ants or upgrades.</p>
       <p><b>🍞 Crumbs</b> are your lives. A bug that reaches the basket costs you crumbs — run out and it's over.</p>
       <p><b>▶ Start</b> each round when your defenses are ready. Survive 40 rounds to win.</p>
+      <p><b>📱 On a phone?</b> Pinch the board to zoom, drag to pan, double-tap to dive in.
+        Drag an ant into place, then tap ✓ to set it down.</p>
       <p class="howto-tip">💡 First game? Just hit Play — the colony will coach you through your first round.</p>
     </div>`,
     [['Got it', hideModal], ['▶ Play now', () => { hideModal(); els.btnTitlePlay.click(); }]]);
@@ -1483,6 +1487,8 @@ export function startGame(mapDef, diffKey, snap = null, forage = false, daily = 
   save.hero = selHero;
   if (!snap) save.gamesPlayed++; // lifetime stats: resumes aren't new games
   persist();
+  resetCam(); // every run opens on the full board
+  maybeRotateHint();
   setMapTheme(mapDef.id); // per-map music identity
   const heroDef = snap ? (snap.heroId ? HEROES[snap.heroId] : null)
     : daily ? HEROES[daily.heroId] : HEROES[selHero];
@@ -1597,8 +1603,8 @@ function spawnCoinFly(wx, wy) {
   const chip = els.sugarVal && els.sugarVal.closest('.hud-chip');
   if (!chip || canvasR.width === 0) return;
   const chipR = chip.getBoundingClientRect();
-  const sx = canvasR.left - fieldR.left + wx * canvasR.width / WORLD_W;
-  const sy = canvasR.top - fieldR.top + wy * canvasR.height / WORLD_H;
+  const sx = canvasR.left - fieldR.left + (wx - cam.x) * cam.z * canvasR.width / WORLD_W;
+  const sy = canvasR.top - fieldR.top + (wy - cam.y) * cam.z * canvasR.height / WORLD_H;
   const dx = (chipR.left - fieldR.left + chipR.width / 2) - sx;
   const dy = (chipR.top - fieldR.top + chipR.height / 2) - sy;
   const el = document.createElement('div');
@@ -1620,12 +1626,43 @@ function spawnCoinFly(wx, wy) {
   };
 }
 
+// one-time phone hint: landscape is the good seat — and it teaches pinch/drag.
+// Fires after the entry morph settles; dismissed by the button or by actually rotating.
+function maybeRotateHint() {
+  const s = loadSave();
+  if (s.rotateHintDone) return;
+  if (!window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches) return;
+  if (window.innerWidth > 700) return;
+  setTimeout(() => {
+    if (!game || document.getElementById('rotate-hint') || loadSave().rotateHintDone) return;
+    const el = document.createElement('div');
+    el.id = 'rotate-hint';
+    el.setAttribute('role', 'status'); // async hint: polite announcement, no focus steal
+    el.innerHTML = `<span class="rh-icon">📱↻</span>
+      <div class="rh-text"><b>Turn your phone sideways</b> — the battlefield fills the screen.<br>
+      Pinch to zoom in · drag to look around.</div>
+      <button class="sticker rh-btn">Got it</button>`;
+    document.body.appendChild(el);
+    const done = () => {
+      const sv = loadSave(); sv.rotateHintDone = true; persist();
+      el.remove();
+      window.removeEventListener('orientationchange', onFlip);
+    };
+    const onFlip = () => setTimeout(() => {
+      if (window.matchMedia('(orientation: landscape)').matches) done();
+    }, 250);
+    el.querySelector('.rh-btn').addEventListener('click', done);
+    window.addEventListener('orientationchange', onFlip);
+  }, 900);
+}
+
 function toMenu() { irisTo(doToMenu); }
 
 function doToMenu() {
   checkRivalOutcome(); // leaving a daily run mid-flight still settles the rivalry
   stopPlacing();
   uiState.selected = null;
+  resetCam();
   game = null;
   hideModal();
   if (els.screenGame) els.screenGame.classList.remove('defeat');
@@ -1764,6 +1801,7 @@ function toggleMute() {
 
 export function tick() {
   if (!game || !els.sugarVal) return;
+  if (uiState.pendingPlace) positionPlaceConfirm(); // chips track the ghost through pans/zooms
   // counter counts up/down instead of snapping
   if (dispSugar == null) dispSugar = game.sugar;
   const dSugar = game.sugar - dispSugar;
@@ -2329,6 +2367,7 @@ function beginPlacing(typeId) {
     uiState.placingDef = game.heroDef;
     uiState.selected = null;
     uiState.ghostX = null;
+    clearPending(); // switching what's in hand un-stages the old spot
     renderPanel();
     syncPlacingCards();
     return;
@@ -2343,6 +2382,7 @@ function beginPlacing(typeId) {
   uiState.placingDef = TOWERS[typeId];
   uiState.selected = null;
   uiState.ghostX = null;
+  clearPending(); // switching what's in hand un-stages the old spot
   renderPanel();
   syncPlacingCards();
 }
@@ -2352,8 +2392,50 @@ function stopPlacing() {
   uiState.placingDef = null;
   uiState.casting = null;
   uiState.ghostX = null;
+  clearPending();
   renderPanel();
   syncPlacingCards();
+}
+
+// ---- staged touch placement (✓/✗ confirm chips) ----
+
+function clearPending() {
+  uiState.pendingPlace = null;
+  if (els.placeConfirm) els.placeConfirm.classList.add('hidden');
+}
+
+// the chips trail the staged ghost, clamped inside the playfield
+function positionPlaceConfirm() {
+  const pp = uiState.pendingPlace, el = els.placeConfirm;
+  if (!pp || !el || el.classList.contains('hidden')) return;
+  const fieldR = els.playfield.getBoundingClientRect();
+  if (!fieldR.width) return;
+  const c = clientFromWorld(pp.x, pp.y);
+  const w = el.offsetWidth || 118, h = el.offsetHeight || 54;
+  const x = Math.max(6, Math.min(fieldR.width - w - 6, c.x - fieldR.left - w / 2));
+  const y = Math.max(6, Math.min(fieldR.height - h - 6, c.y - fieldR.top + 44));
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+}
+
+function confirmPending() {
+  const pp = uiState.pendingPlace;
+  if (!pp || !game || !uiState.placingType) { clearPending(); return; }
+  unlockAudio();
+  const t = uiState.placingType === 'hero'
+    ? game.placeHero(pp.x, pp.y)
+    : game.placeTower(uiState.placingType, pp.x, pp.y);
+  if (t) {
+    const D = window.__diag;
+    if (D) { D.placed++; D.last = uiState.placingType; }
+    stopPlacing(); // also clears the pending spot + chips
+    uiState.selected = t;
+    if (t.isHero) renderShop();
+    renderPanel();
+  } else {
+    sfx.deny(); // spot went invalid (or sugar ran dry) — keep the ghost for a re-aim
+    shakeEl(els.placeConfirm);
+  }
 }
 
 function beginCast(kind) {
@@ -2366,17 +2448,42 @@ function beginCast(kind) {
   uiState.placingDef = null;
   uiState.casting = kind;
   uiState.ghostX = null;
+  clearPending();
 }
 
 // ---------- canvas input ----------
 
-// world coords from a viewport point (works for mouse, pen and touch)
+// world coords from a viewport point (works for mouse, pen and touch; camera-aware)
 function worldFromClient(clientX, clientY) {
   const r = els.canvas.getBoundingClientRect();
   return {
-    x: (clientX - r.left) * WORLD_W / r.width,
-    y: (clientY - r.top) * WORLD_H / r.height,
+    x: cam.x + (clientX - r.left) * (WORLD_W / r.width) / cam.z,
+    y: cam.y + (clientY - r.top) * (WORLD_H / r.height) / cam.z,
   };
+}
+
+// the inverse: viewport (client) point for a world point
+function clientFromWorld(wx, wy) {
+  const r = els.canvas.getBoundingClientRect();
+  return {
+    x: r.left + (wx - cam.x) * cam.z * r.width / WORLD_W,
+    y: r.top + (wy - cam.y) * cam.z * r.height / WORLD_H,
+  };
+}
+
+// CSS px on screen per world unit — screen-space hit tolerances divide by this
+function cssPerWorld() {
+  const r = els.canvas.getBoundingClientRect();
+  return r.width ? (r.width / WORLD_W) * cam.z : 1;
+}
+
+// aim the world at a client point while keeping/setting zoom z (pin-under-finger math)
+function pinWorldToClient(wx, wy, clientX, clientY, z) {
+  cam.z = Math.max(1, Math.min(CAM_MAX, z));
+  const r = els.canvas.getBoundingClientRect();
+  cam.x = wx - (clientX - r.left) * (WORLD_W / r.width) / cam.z;
+  cam.y = wy - (clientY - r.top) * (WORLD_H / r.height) / cam.z;
+  clampCam();
 }
 
 function wireCanvas() {
@@ -2422,9 +2529,10 @@ function wireCanvas() {
       return;
     }
     let best = null, bd = 1e9;
+    const minTol = 22 / cssPerWorld(); // a 44px-wide thumb target even when the board renders tiny
     for (const t of game.towers) {
       const d = dist(p.x, p.y, t.x, t.y);
-      if (d < t.def.footprint + 10 && d < bd) { bd = d; best = t; }
+      if (d < Math.max(t.def.footprint + 10, minTol) && d < bd) { bd = d; best = t; }
     }
     uiState.selected = best;
     renderPanel();
@@ -2441,33 +2549,161 @@ function wireCanvas() {
   cv.addEventListener('pointerleave', () => { uiState.ghostX = null; });
   cv.addEventListener('contextmenu', (e) => { e.preventDefault(); stopPlacing(); });
 
-  // Touch: drag to aim, lift to place. preventDefault stops page scroll/zoom + the synthetic
-  // click (so no double). touch-action:none on the canvas keeps the gesture on the board.
-  const touchXY = (ev) => {
-    const t = (ev.touches && ev.touches[0]) || (ev.changedTouches && ev.changedTouches[0]);
-    return t ? worldFromClient(t.clientX, t.clientY) : null;
+  // Touch: 1 finger aims/taps/pans, 2 fingers pinch-zoom. preventDefault stops page
+  // scroll/zoom + the synthetic click (so no double); touch-action:none keeps the gesture
+  // on the board. Placement is STAGED on touch: the ghost rides above the fingertip so a
+  // thumb never hides the drop point, and lifting parks it for the ✓/✗ chips to settle.
+  const AIM_LIFT = 64; // CSS px the ghost floats above the finger
+  const aimFromTouch = (clientX, clientY) => {
+    const p = worldFromClient(clientX, clientY - AIM_LIFT);
+    p.x = Math.max(16, Math.min(WORLD_W - 16, p.x));
+    p.y = Math.max(16, Math.min(WORLD_H - 16, p.y));
+    return p;
   };
-  let touchPt = null;
+  const touchPts = new Map(); // id → live client coords
+  let gesture = null;         // 'aim' | 'tap' | 'pan' | 'pinch'
+  let tapStart = null, lastTap = null, pinchRef = null, panRef = null;
+  let aimMoved = false; // a deliberate tap drops AT the tap; only a drag lifts the ghost
+
   cv.addEventListener('touchstart', (ev) => {
     if (!game) return;
     D.touchstart++; ev.preventDefault();
-    touchPt = touchXY(ev);
-    if (touchPt) moveTo(touchPt);
+    for (const t of ev.changedTouches) touchPts.set(t.identifier, { cx: t.clientX, cy: t.clientY });
+    if (touchPts.size === 2) {
+      gesture = 'pinch'; // a second finger turns anything into a pinch
+      if (!uiState.pendingPlace) uiState.ghostX = null;
+      const [a, b] = [...touchPts.values()];
+      const mid = worldFromClient((a.cx + b.cx) / 2, (a.cy + b.cy) / 2);
+      pinchRef = { d: Math.hypot(a.cx - b.cx, a.cy - b.cy) || 1, z: cam.z, wx: mid.x, wy: mid.y };
+    } else if (touchPts.size === 1) {
+      const t = ev.changedTouches[0];
+      tapStart = { cx: t.clientX, cy: t.clientY };
+      if (uiState.placingType || uiState.casting) {
+        gesture = 'aim';
+        aimMoved = false;
+        if (uiState.pendingPlace) els.placeConfirm.classList.add('hidden'); // chips wait out the re-aim
+        moveTo(worldFromClient(t.clientX, t.clientY)); // ghost starts under the finger…
+      } else {
+        gesture = 'tap'; // becomes a pan once the finger travels
+      }
+    }
   }, { passive: false });
+
   cv.addEventListener('touchmove', (ev) => {
     if (!game) return;
     ev.preventDefault();
-    const p = touchXY(ev);
-    if (p) { touchPt = p; moveTo(p); }
+    for (const t of ev.changedTouches) {
+      const p = touchPts.get(t.identifier);
+      if (p) { p.cx = t.clientX; p.cy = t.clientY; }
+    }
+    if (gesture === 'pinch' && touchPts.size >= 2) {
+      const [a, b] = [...touchPts.values()];
+      const d = Math.hypot(a.cx - b.cx, a.cy - b.cy) || 1;
+      // zoom to the new spread, keeping the grabbed world point pinned under the fingers
+      pinWorldToClient(pinchRef.wx, pinchRef.wy, (a.cx + b.cx) / 2, (a.cy + b.cy) / 2, pinchRef.z * d / pinchRef.d);
+    } else if (gesture === 'aim') {
+      const t = ev.touches[0];
+      if (!t) return;
+      if (!aimMoved && tapStart
+          && Math.hypot(t.clientX - tapStart.cx, t.clientY - tapStart.cy) > 8) aimMoved = true;
+      // …and lifts above it once this is a real drag, so the thumb never hides the drop
+      moveTo(aimMoved ? aimFromTouch(t.clientX, t.clientY) : worldFromClient(t.clientX, t.clientY));
+    } else if (gesture === 'tap' || gesture === 'pan') {
+      const t = ev.touches[0];
+      if (!t) return;
+      if (gesture === 'tap' && tapStart
+          && Math.hypot(t.clientX - tapStart.cx, t.clientY - tapStart.cy) > 12) {
+        gesture = 'pan';
+        panRef = worldFromClient(tapStart.cx, tapStart.cy); // anchor at the touch, not after it
+      }
+      if (gesture === 'pan' && panRef) {
+        // drag the world with the finger (only moves once zoomed — clamped at 1x)
+        const p = worldFromClient(t.clientX, t.clientY);
+        cam.x += panRef.x - p.x; cam.y += panRef.y - p.y; clampCam();
+        panRef = worldFromClient(t.clientX, t.clientY);
+      }
+    }
   }, { passive: false });
+
   cv.addEventListener('touchend', (ev) => {
     if (!game) return;
     D.touchend++; ev.preventDefault();
-    const p = touchXY(ev) || touchPt;
-    if (p) { const was = uiState.placingType || uiState.casting || 'select'; downAt(p); D.placed++; D.last = was; }
-    uiState.ghostX = null; touchPt = null; lastTouchT = performance.now();
+    for (const t of ev.changedTouches) touchPts.delete(t.identifier);
+    lastTouchT = performance.now();
+    if (gesture === 'pinch') {
+      if (touchPts.size >= 2) return;
+      if (touchPts.size === 1) { // one finger stays down: glide into a pan
+        gesture = 'pan';
+        const [a] = [...touchPts.values()];
+        panRef = worldFromClient(a.cx, a.cy);
+      } else gesture = null;
+      return;
+    }
+    if (touchPts.size > 0) return;
+    const g = gesture; gesture = null;
+    if (g === 'pan') { panRef = null; return; }
+    const t0 = ev.changedTouches[0];
+    if (!t0) return;
+    if (g === 'aim') {
+      const p = aimMoved ? aimFromTouch(t0.clientX, t0.clientY) : worldFromClient(t0.clientX, t0.clientY);
+      if (uiState.placingType) stagePlacement(p);
+      else { // powers cast on lift, with the same aim
+        const was = uiState.casting || 'select';
+        downAt(p); D.placed++; D.last = was;
+        uiState.ghostX = null;
+      }
+      return;
+    }
+    if (g === 'tap') {
+      const now = performance.now();
+      if (lastTap && now - lastTap.t < 320
+          && Math.hypot(t0.clientX - lastTap.cx, t0.clientY - lastTap.cy) < 40) {
+        lastTap = null; // double-tap: dive onto the spot / back out to the full board
+        const w = worldFromClient(t0.clientX, t0.clientY);
+        if (cam.z > 1.01) resetCam();
+        else pinWorldToClient(w.x, w.y, t0.clientX, t0.clientY, 2);
+        return;
+      }
+      lastTap = { cx: t0.clientX, cy: t0.clientY, t: now };
+      D.placed++; D.last = 'select';
+      downAt(worldFromClient(t0.clientX, t0.clientY));
+    }
   }, { passive: false });
-  cv.addEventListener('touchcancel', () => { uiState.ghostX = null; touchPt = null; });
+
+  cv.addEventListener('touchcancel', () => {
+    touchPts.clear(); gesture = null; panRef = null; pinchRef = null;
+    if (uiState.pendingPlace) { // interrupted mid-adjust: the staged spot stands
+      els.placeConfirm.classList.remove('hidden');
+      positionPlaceConfirm();
+    } else uiState.ghostX = null;
+  });
+
+  // desktop nicety (and QA): the wheel zooms about the cursor
+  cv.addEventListener('wheel', (ev) => {
+    if (!game) return;
+    ev.preventDefault();
+    const w = worldFromClient(ev.clientX, ev.clientY);
+    pinWorldToClient(w.x, w.y, ev.clientX, ev.clientY, cam.z * Math.exp(-ev.deltaY * 0.0015));
+  }, { passive: false });
+
+  // touch placement is a two-step: park the ghost, then ✓ commits / ✗ walks away
+  function stagePlacement(p) {
+    moveTo(p); // ghost + validity ring hold at the staged spot
+    uiState.pendingPlace = { x: p.x, y: p.y };
+    els.placeConfirm.classList.remove('hidden');
+    positionPlaceConfirm();
+  }
+
+  // staged-placement confirm chips live in the playfield overlay (thumb-sized)
+  els.placeConfirm = document.createElement('div');
+  els.placeConfirm.id = 'place-confirm';
+  els.placeConfirm.className = 'hidden';
+  els.placeConfirm.innerHTML = `
+    <button id="pc-yes" class="sticker" aria-label="Place ant here">✓</button>
+    <button id="pc-no" class="sticker" aria-label="Cancel placement">✗</button>`;
+  els.playfield.appendChild(els.placeConfirm);
+  els.placeConfirm.querySelector('#pc-yes').addEventListener('click', confirmPending);
+  els.placeConfirm.querySelector('#pc-no').addEventListener('click', () => stopPlacing());
 
   // Placement via CLICK — the same event that makes the menu buttons work on iOS, so this
   // fires even when a <canvas> gets no pointer/touch events. Skipped when a touchend just
