@@ -36,10 +36,13 @@ html, body {
   height: 100%;
   font-family: 'Baloo 2', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
   color: var(--ink);
+  /* dusk-table backdrop: deep warm ink-browns with a honey key light from above —
+     the board is the bright thing on the table, the chrome recedes (was lawn green,
+     which fought the playfield for attention) */
   background:
-    radial-gradient(ellipse at 20% 10%, #86bd66 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 90%, #4e8a38 0%, transparent 60%),
-    #63a144;
+    radial-gradient(ellipse at 50% 18%, rgba(255, 209, 102, 0.12) 0%, transparent 58%),
+    radial-gradient(ellipse at 50% 118%, #5c3a1e 0%, transparent 72%),
+    linear-gradient(180deg, #241407 0%, #33200f 55%, #3d2712 100%);
   overflow: hidden;
 }
 
